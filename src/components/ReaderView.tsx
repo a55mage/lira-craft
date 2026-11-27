@@ -439,6 +439,7 @@ export function ReaderView({
   if (!version) return null;
 
   return (
+    <>
     <div className={`mx-auto px-4 pt-5 pb-24 space-y-4 animate-fade-up ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
       {/* Top Header & Version Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
@@ -956,9 +957,11 @@ export function ReaderView({
         </div>
       )}
 
-      {/* Full-Width Docked Bottom Player Bar */}
+      </div>
+
+      {/* Full-Width Docked Bottom Player Bar (outside animated container so fixed sticks to viewport) */}
       <div
-        className="fixed bottom-0 inset-x-0 z-30 border-t backdrop-blur-md no-print"
+        className="fixed bottom-0 inset-x-0 z-40 border-t backdrop-blur-md no-print"
         style={{
           backgroundColor: 'color-mix(in srgb, var(--bg-surface) 96%, transparent)',
           borderColor: 'var(--border-color)',
@@ -1113,6 +1116,6 @@ export function ReaderView({
           </label>
         </div>
       </div>
-    </div>
+    </>
   );
 }
