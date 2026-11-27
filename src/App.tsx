@@ -133,12 +133,12 @@ export default function App() {
               className="flex items-center gap-2 font-bold text-base tracking-tight cursor-pointer shrink-0"
             >
               <span
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm"
                 style={{ backgroundColor: 'var(--accent)' }}
               >
                 <Music className="w-4 h-4" />
               </span>
-              <span>Spartito</span>
+              <span className="font-display text-lg tracking-tight">Spartito</span>
             </button>
 
             <span

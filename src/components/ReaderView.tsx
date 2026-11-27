@@ -9,6 +9,7 @@ import {
   Edit3,
   Eye,
   Gauge,
+  Lightbulb,
   Maximize2,
   Minimize2,
   Music2,
@@ -22,12 +23,51 @@ import {
 } from 'lucide-react';
 import { PitchDetector } from 'pitchy';
 import type { NotationSystem, ReaderModules, Track } from '../types/music';
-import { extractUniqueChords, parseChordPro } from '../lib/chordPro';
+import { extractUniqueChords, parseChordPro, type ParsedLine } from '../lib/chordPro';
 import { formatChord, suggestBestCapo, transposeChord } from '../lib/musicTheory';
 import { audioEngine, buildTimelineFromChordPro, parseAbcToTimeline } from '../lib/audioEngine';
 import { ChordDiagramCard } from './ChordDiagramCard';
 import { SheetMusicPanel } from './SheetMusicPanel';
 import { SimplyPianoPanel, type WaitModeSource } from './SimplyPianoPanel';
+import { INSTRUMENT_NAME, InstrumentIcon, InstrumentMonogram } from './InstrumentIcon';
+
+interface LyricSectionGroup {
+  title?: string;
+  kind: 'chorus' | 'verse' | 'other';
+  lines: ParsedLine[];
+}
+
+function classifySection(title?: string): 'chorus' | 'verse' | 'other' {
+  if (!title) return 'other';
+  const t = title.toLowerCase();
+  if (/chorus|ritornello|refrain|hook/.test(t)) return 'chorus';
+  if (/verse|strofa|tema/.test(t)) return 'verse';
+  return 'other';
+}
+
+function groupLyricsBySection(lines: ParsedLine[]): LyricSectionGroup[] {
+  const groups: LyricSectionGroup[] = [];
+  let current: LyricSectionGroup = { kind: 'other', lines: [] };
+
+  for (const line of lines) {
+    if (line.type === 'section') {
+      if (current.lines.length > 0 || current.title) {
+        groups.push(current);
+      }
+      current = {
+        title: line.sectionTitle,
+        kind: classifySection(line.sectionTitle),
+        lines: [],
+      };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  if (current.lines.length > 0 || current.title) {
+    groups.push(current);
+  }
+  return groups;
+}
 
 interface ReaderViewProps {
   track: Track;
@@ -104,6 +144,8 @@ export function ReaderView({
     if (!version) return [];
     return parseChordPro(version.lyricsChords, transpose, notation);
   }, [version, transpose, notation]);
+
+  const lyricSections = useMemo(() => groupLyricsBySection(parsedLyrics), [parsedLyrics]);
 
   const uniqueChords = useMemo(() => {
     if (!version) return [];
@@ -397,7 +439,7 @@ export function ReaderView({
   if (!version) return null;
 
   return (
-    <div className={`mx-auto px-4 pt-5 pb-24 space-y-4 ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
+    <div className={`mx-auto px-4 pt-5 pb-24 space-y-4 animate-fade-up ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
       {/* Top Header & Version Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-3 min-w-0">
@@ -413,10 +455,14 @@ export function ReaderView({
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
+          <InstrumentMonogram instrument={version.instrument} size="lg" />
           <div className="min-w-0">
-            <h1 className="text-xl font-bold truncate">{track.title}</h1>
-            <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-              {track.artist} · Tonalità <strong>{currentKeyDisplay}</strong> · {effectiveBpm} BPM · {track.timeSignature}
+            <h1 className="font-display text-xl sm:text-2xl font-bold truncate leading-tight">
+              {track.title}
+            </h1>
+            <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              {track.artist} · Tonalità <strong className="font-mono">{currentKeyDisplay}</strong> ·{' '}
+              <span className="font-mono">{effectiveBpm} BPM</span> · {track.timeSignature}
             </p>
           </div>
         </div>
@@ -438,7 +484,7 @@ export function ReaderView({
             >
               {track.versions.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.instrument === 'piano' ? '🎹' : v.instrument === 'guitar' ? '🎸' : '🏝️'} {v.name}
+                  {INSTRUMENT_NAME[v.instrument]} — {v.name}
                 </option>
               ))}
             </select>
@@ -627,15 +673,18 @@ export function ReaderView({
               style={{ borderColor: 'var(--border-color)' }}
             >
               {version.notes && (
-                <div style={{ color: 'var(--text-secondary)' }}>
-                  💡 <strong>Consiglio studio:</strong> {version.notes}
+                <div className="inline-flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <Lightbulb className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent-warm)' }} />
+                  <span>
+                    <strong>Consiglio studio:</strong> {version.notes}
+                  </span>
                 </div>
               )}
               {capoSuggestion && capoSuggestion.capo > 0 && (
                 <button
                   type="button"
                   onClick={() => setTranspose((t) => t - capoSuggestion.capo)}
-                  className="px-2.5 py-1 rounded-lg font-medium cursor-pointer border"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium cursor-pointer border"
                   style={{
                     backgroundColor: 'var(--bg-surface-2)',
                     borderColor: 'var(--border-color)',
@@ -643,7 +692,8 @@ export function ReaderView({
                   }}
                   title="Applica trasposizione per usare il capotasto"
                 >
-                  🎸 Suggerimento Capotasto: tasto {capoSuggestion.capo} ({capoSuggestion.easyCount}/{capoSuggestion.total} accordi facili)
+                  <InstrumentIcon instrument={version.instrument} className="w-3.5 h-3.5" />
+                  Capotasto consigliato: tasto {capoSuggestion.capo} ({capoSuggestion.easyCount}/{capoSuggestion.total} accordi facili)
                 </button>
               )}
             </div>
@@ -712,8 +762,8 @@ export function ReaderView({
           {/* Lyrics Column */}
           <div
             ref={lyricsContainerRef}
-            className="rounded-2xl border p-5 sm:p-6 space-y-4 print-sheet"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+            className="rounded-2xl border p-5 sm:p-6 space-y-4 print-sheet music-paper"
+            style={{ borderColor: 'var(--border-color)' }}
           >
             <div
               className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 no-print"
@@ -793,58 +843,82 @@ export function ReaderView({
             </div>
 
             <div
-              className={`leading-relaxed ${lyricsColumns === 2 ? 'md:columns-2 md:gap-8' : 'space-y-3'}`}
+              className={`leading-relaxed ${lyricsColumns === 2 ? 'md:columns-2 md:gap-8' : 'space-y-4'}`}
               style={{ fontSize: `${performanceMode ? Math.max(lyricsFontSize, 20) : lyricsFontSize}px` }}
             >
-              {parsedLyrics.map((line, idx) => {
-                if (line.type === 'empty') {
-                  return <div key={idx} className="h-3" />;
-                }
-                if (line.type === 'section') {
-                  return (
-                    <div
-                      key={idx}
-                      className="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md mt-2 mb-1 break-after-avoid"
-                      style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
-                    >
-                      {line.sectionTitle}
-                    </div>
-                  );
-                }
+              {lyricSections.map((section, sIdx) => {
+                const borderColor =
+                  section.kind === 'chorus'
+                    ? '#adc178'
+                    : section.kind === 'verse'
+                    ? '#a98467'
+                    : 'var(--border-color)';
+                const isChorus = section.kind === 'chorus';
+
                 return (
-                  <div
-                    key={idx}
-                    className="flex flex-wrap items-end gap-y-1.5 leading-snug mb-2.5 break-inside-avoid"
+                  <section
+                    key={sIdx}
+                    className={`rounded-r-xl pl-3.5 py-1.5 mb-4 break-inside-avoid ${isChorus ? 'pr-3' : ''}`}
+                    style={{
+                      borderLeft: `${isChorus ? '4px' : '2.5px'} solid ${borderColor}`,
+                      backgroundColor: isChorus
+                        ? 'color-mix(in srgb, var(--accent-bg) 42%, transparent)'
+                        : 'transparent',
+                    }}
                   >
-                    {line.tokens.map((tok, tIdx) => (
-                      <span key={tIdx} className="inline-flex flex-col items-start">
-                        {tok.chord ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (tok.rawChord) {
-                                audioEngine.playChord(tok.rawChord, version.instrument);
-                                setSelectedChordPreview(tok.rawChord);
-                              }
-                            }}
-                            className="font-extrabold px-1.5 py-0.5 rounded mb-0.5 mr-1 cursor-pointer transition hover:scale-105"
-                            style={{
-                              fontSize: `${Math.max(11, Math.round(lyricsFontSize * 0.78))}px`,
-                              backgroundColor:
-                                tok.rawChord === activeChord ? 'var(--accent)' : 'var(--accent-bg)',
-                              color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
-                            }}
-                            title="Clicca per ascoltare l'accordo"
-                          >
-                            {tok.chord}
-                          </button>
-                        ) : (
-                          <span className="h-5" />
-                        )}
-                        <span className="whitespace-pre-wrap">{tok.text || '\u00A0'}</span>
-                      </span>
-                    ))}
-                  </div>
+                    {section.title && (
+                      <div
+                        className="inline-block text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md mb-2"
+                        style={{
+                          backgroundColor: isChorus ? '#adc178' : 'var(--bg-surface-2)',
+                          color: isChorus ? '#3b3029' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {section.title}
+                      </div>
+                    )}
+
+                    {section.lines.map((line, idx) => {
+                      if (line.type === 'empty') {
+                        return <div key={idx} className="h-2" />;
+                      }
+                      return (
+                        <div
+                          key={idx}
+                          className="flex flex-wrap items-end gap-y-1.5 leading-snug mb-2"
+                        >
+                          {line.tokens.map((tok, tIdx) => (
+                            <span key={tIdx} className="inline-flex flex-col items-start">
+                              {tok.chord ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (tok.rawChord) {
+                                      audioEngine.playChord(tok.rawChord, version.instrument);
+                                      setSelectedChordPreview(tok.rawChord);
+                                    }
+                                  }}
+                                  className="font-extrabold px-1.5 py-0.5 rounded mb-0.5 mr-1 cursor-pointer transition hover:scale-105"
+                                  style={{
+                                    fontSize: `${Math.max(11, Math.round(lyricsFontSize * 0.78))}px`,
+                                    backgroundColor:
+                                      tok.rawChord === activeChord ? 'var(--accent)' : 'var(--accent-bg)',
+                                    color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
+                                  }}
+                                  title="Clicca per ascoltare l'accordo"
+                                >
+                                  {tok.chord}
+                                </button>
+                              ) : (
+                                <span className="h-5" />
+                              )}
+                              <span className="whitespace-pre-wrap">{tok.text || '\u00A0'}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </section>
                 );
               })}
             </div>

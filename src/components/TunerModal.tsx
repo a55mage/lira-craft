@@ -19,7 +19,7 @@ interface TuningString {
 
 const TUNING_PRESETS: Record<string, { label: string; strings: TuningString[] }> = {
   guitar_std: {
-    label: '🎸 Chitarra Standard (EADGBE)',
+    label: 'Chitarra Standard (EADGBE)',
     strings: [
       { note: 'E2', freq: 82.41 },
       { note: 'A2', freq: 110.0 },
@@ -30,7 +30,7 @@ const TUNING_PRESETS: Record<string, { label: string; strings: TuningString[] }>
     ],
   },
   ukulele_std: {
-    label: '🏝️ Ukulele Standard (GCEA)',
+    label: 'Ukulele Standard (GCEA)',
     strings: [
       { note: 'G4', freq: 392.0 },
       { note: 'C4', freq: 261.63 },
@@ -39,7 +39,7 @@ const TUNING_PRESETS: Record<string, { label: string; strings: TuningString[] }>
     ],
   },
   guitar_drop_d: {
-    label: '🎸 Chitarra Drop D (DADGBE)',
+    label: 'Chitarra Drop D (DADGBE)',
     strings: [
       { note: 'D2', freq: 73.42 },
       { note: 'A2', freq: 110.0 },
@@ -50,7 +50,7 @@ const TUNING_PRESETS: Record<string, { label: string; strings: TuningString[] }>
     ],
   },
   chromatic: {
-    label: '🎼 Cromatico (Tutti gli strumenti)',
+    label: 'Cromatico (Tutti gli strumenti)',
     strings: [],
   },
 };

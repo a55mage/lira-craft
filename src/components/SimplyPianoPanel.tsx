@@ -346,7 +346,7 @@ export function SimplyPianoPanel({
                       audioEngine.playNote(midi, 0.7, 'piano');
                       onUserNotePlayed(midi);
                     }}
-                    className="w-full h-full border-r flex items-end justify-center pb-1.5 text-[10px] font-semibold transition cursor-pointer"
+                    className={`w-full h-full border-r flex items-end justify-center pb-1.5 text-[10px] font-semibold transition-all duration-100 cursor-pointer ${isLit ? 'key-glow' : ''}`}
                     style={{
                       borderColor: '#d8cfaf',
                       backgroundColor: isUserPressed ? '#a98467' : isLit ? '#adc178' : '#faf7ec',

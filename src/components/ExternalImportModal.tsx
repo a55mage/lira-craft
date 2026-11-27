@@ -187,9 +187,9 @@ export function ExternalImportModal({ open, onClose, onImported }: ExternalImpor
             className="px-3 py-2 rounded-xl border text-xs"
             style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
           >
-            <option value="guitar">🎸 Chitarra</option>
-            <option value="ukulele">🏝️ Ukulele</option>
-            <option value="piano">🎹 Piano</option>
+            <option value="guitar">Chitarra</option>
+            <option value="ukulele">Ukulele</option>
+            <option value="piano">Piano</option>
           </select>
         </div>
 

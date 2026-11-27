@@ -202,7 +202,7 @@ export function ChordDiagramCard({
 
       {!compact && diagram?.easyNote && (
         <div className="text-[10px] text-center leading-tight px-1" style={{ color: 'var(--text-secondary)' }}>
-          💡 {diagram.easyNote}
+          {diagram.easyNote}
         </div>
       )}
     </button>

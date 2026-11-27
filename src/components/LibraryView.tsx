@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Difficulty, Instrument, Track } from '../types/music';
 import { deleteTrack, restoreDemoTracks, saveTrack, toggleFavorite } from '../db/database';
+import { INSTRUMENT_NAME, InstrumentIcon, InstrumentMonogram } from './InstrumentIcon';
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -22,12 +23,6 @@ interface LibraryViewProps {
 
 type SortOption = 'date_desc' | 'date_asc' | 'title_asc' | 'artist_asc';
 type ViewMode = 'compact_cards' | 'list';
-
-const INSTRUMENT_BADGE: Record<Instrument, string> = {
-  piano: '🎹 Piano',
-  guitar: '🎸 Chitarra',
-  ukulele: '🏝️ Ukulele',
-};
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   beginner: 'Principiante',
@@ -95,7 +90,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-5 space-y-4">
+    <div className="max-w-7xl mx-auto px-4 py-5 space-y-4 animate-fade-up">
       {/* Compact Toolbar: Search, Filters, Sort, View Mode */}
       <div className="flex flex-col lg:flex-row gap-2.5">
         <div className="relative flex-1">
@@ -108,7 +103,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Cerca titolo, artista o tag..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border text-sm"
+            className="w-full pl-10 pr-4 py-2 rounded-xl border text-sm transition focus:outline-none"
             style={{
               backgroundColor: 'var(--bg-surface)',
               borderColor: 'var(--border-color)',
@@ -128,9 +123,9 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             }}
           >
             <option value="all">Tutti gli strumenti</option>
-            <option value="piano">🎹 Piano</option>
-            <option value="guitar">🎸 Chitarra</option>
-            <option value="ukulele">🏝️ Ukulele</option>
+            <option value="piano">Piano</option>
+            <option value="guitar">Chitarra</option>
+            <option value="ukulele">Ukulele</option>
           </select>
 
           <select
@@ -174,7 +169,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
           <button
             type="button"
             onClick={() => setOnlyFavorites((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer transition"
             style={{
               backgroundColor: onlyFavorites ? 'var(--accent-bg)' : 'var(--bg-surface)',
               borderColor: onlyFavorites ? 'var(--accent)' : 'var(--border-color)',
@@ -230,11 +225,11 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
       {/* Empty state */}
       {filteredAndSorted.length === 0 ? (
         <div
-          className="rounded-2xl border p-10 text-center space-y-3"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+          className="rounded-2xl border p-10 text-center space-y-3 music-paper"
+          style={{ borderColor: 'var(--border-color)' }}
         >
           <Music className="w-10 h-10 mx-auto opacity-40" />
-          <div className="font-semibold">Nessun brano trovato</div>
+          <div className="font-display font-semibold text-base">Nessun brano trovato</div>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             Modifica i filtri, aggiungi un nuovo brano dalla barra in alto oppure ripristina i brani demo.
           </p>
@@ -256,27 +251,20 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
       ) : viewMode === 'list' ? (
         /* LIST VIEW */
         <div
-          className="rounded-2xl border divide-y overflow-hidden"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+          className="rounded-2xl border divide-y overflow-hidden music-paper"
+          style={{ borderColor: 'var(--border-color)' }}
         >
           {filteredAndSorted.map((track) => {
+            const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
             const instruments = Array.from(new Set(track.versions.map((v) => v.instrument)));
             return (
               <div
                 key={track.id}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 hover:opacity-95 transition"
+                className="flex items-center justify-between gap-3 px-4 py-2.5 transition hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                 style={{ borderColor: 'var(--border-color)' }}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => void toggleFavorite(track.id)}
-                    aria-label={track.isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-                    className="p-1 rounded cursor-pointer shrink-0"
-                    style={{ color: track.isFavorite ? '#a98467' : 'var(--text-muted)' }}
-                  >
-                    <Heart className={`w-4 h-4 ${track.isFavorite ? 'fill-current' : ''}`} />
-                  </button>
+                  <InstrumentMonogram instrument={primaryInst} size="sm" />
 
                   <button
                     type="button"
@@ -284,7 +272,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                     className="text-left min-w-0 flex-1 group cursor-pointer"
                   >
                     <div className="flex items-baseline gap-2 min-w-0">
-                      <span className="font-semibold text-sm truncate group-hover:underline">
+                      <span className="font-display font-semibold text-sm truncate group-hover:underline">
                         {track.title}
                       </span>
                       <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>
@@ -297,24 +285,25 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                   </button>
                 </div>
 
-                {/* Metadata & quick versions */}
+                {/* Metadata */}
                 <div className="hidden md:flex items-center gap-1.5 shrink-0 text-[11px]">
                   {instruments.map((inst) => (
                     <span
                       key={inst}
-                      className="px-2 py-0.5 rounded-md font-medium"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium"
                       style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
                     >
-                      {INSTRUMENT_BADGE[inst]}
+                      <InstrumentIcon instrument={inst} className="w-3 h-3" />
+                      {INSTRUMENT_NAME[inst]}
                     </span>
                   ))}
                   <span
-                    className="px-2 py-0.5 rounded-md font-medium"
+                    className="px-2 py-0.5 rounded-md font-mono font-medium"
                     style={{ backgroundColor: 'var(--bg-surface-2)' }}
                   >
-                    {track.originalKey} · {track.defaultBpm} BPM
+                    {track.originalKey} · {track.defaultBpm}
                   </span>
-                  <span className="px-2 py-0.5 rounded-md" style={{ color: 'var(--text-muted)' }}>
+                  <span className="px-1.5 py-0.5 rounded-md" style={{ color: 'var(--text-muted)' }}>
                     {track.versions.length} ver.
                   </span>
                 </div>
@@ -323,8 +312,17 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
+                    onClick={() => void toggleFavorite(track.id)}
+                    aria-label={track.isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+                    className="p-1.5 rounded cursor-pointer"
+                    style={{ color: track.isFavorite ? '#a98467' : 'var(--text-muted)' }}
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${track.isFavorite ? 'fill-current' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onOpenTrack(track.id)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90"
                     style={{ backgroundColor: 'var(--accent)' }}
                   >
                     Apri
@@ -368,27 +366,26 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
         /* COMPACT CARDS VIEW */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filteredAndSorted.map((track) => {
+            const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
             const instruments = Array.from(new Set(track.versions.map((v) => v.instrument)));
             return (
               <div
                 key={track.id}
-                className="rounded-xl border p-3.5 flex flex-col justify-between gap-2.5 transition hover:shadow-sm"
-                style={{
-                  backgroundColor: 'var(--bg-surface)',
-                  borderColor: 'var(--border-color)',
-                }}
+                className="rounded-xl border p-3.5 flex flex-col justify-between gap-2.5 transition duration-200 hover:-translate-y-0.5 music-paper"
+                style={{ borderColor: 'var(--border-color)' }}
               >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <InstrumentMonogram instrument={primaryInst} size="md" />
                     <button
                       type="button"
                       onClick={() => onOpenTrack(track.id)}
-                      className="text-left group cursor-pointer min-w-0"
+                      className="text-left group cursor-pointer min-w-0 flex-1"
                     >
-                      <h2 className="font-semibold text-sm leading-snug group-hover:underline truncate">
+                      <h2 className="font-display font-semibold text-sm leading-snug group-hover:underline truncate">
                         {track.title}
                       </h2>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                         {track.artist}
                       </p>
                     </button>
@@ -406,7 +403,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                   {/* Compact Meta Pills */}
                   <div className="flex flex-wrap gap-1 text-[10px]">
                     <span
-                      className="px-1.5 py-0.5 rounded font-medium"
+                      className="px-1.5 py-0.5 rounded font-mono font-medium"
                       style={{ backgroundColor: 'var(--bg-surface-2)' }}
                     >
                       {track.originalKey} · {track.defaultBpm} BPM
@@ -414,10 +411,11 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                     {instruments.map((inst) => (
                       <span
                         key={inst}
-                        className="px-1.5 py-0.5 rounded font-medium"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium"
                         style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent)' }}
                       >
-                        {INSTRUMENT_BADGE[inst]}
+                        <InstrumentIcon instrument={inst} className="w-2.5 h-2.5" />
+                        {INSTRUMENT_NAME[inst]}
                       </span>
                     ))}
                   </div>
@@ -447,7 +445,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                   <button
                     type="button"
                     onClick={() => onOpenTrack(track.id)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer"
+                    className="px-3 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90"
                     style={{ backgroundColor: 'var(--accent)' }}
                   >
                     Apri

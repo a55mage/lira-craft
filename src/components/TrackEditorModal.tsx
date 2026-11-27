@@ -252,9 +252,9 @@ export function TrackEditorModal({ open, onClose, initialTrack, onSaved }: Track
                     className="w-full px-3 py-1.5 rounded-lg border text-sm"
                     style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
                   >
-                    <option value="piano">🎹 Piano</option>
-                    <option value="guitar">🎸 Chitarra</option>
-                    <option value="ukulele">🏝️ Ukulele</option>
+                    <option value="piano">Piano</option>
+                    <option value="guitar">Chitarra</option>
+                    <option value="ukulele">Ukulele</option>
                   </select>
                 </div>
                 <div>
