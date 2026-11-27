@@ -147,6 +147,50 @@ export function ReaderView({
 
   const lyricSections = useMemo(() => groupLyricsBySection(parsedLyrics), [parsedLyrics]);
 
+  // Index every lyric line and every chord occurrence sequentially so only the SINGLE
+  // current line and SINGLE current chord occurrence highlight during playback.
+  const lyricPlaybackIndex = useMemo(() => {
+    let lineCount = 0;
+    let chordCount = 0;
+    const lineMeta = new Map<string, { lineIdx: number; chordIndices: Map<number, number> }>();
+    const chordToLine = new Map<number, number>();
+
+    lyricSections.forEach((sec, sIdx) => {
+      sec.lines.forEach((line, lIdx) => {
+        if (line.type !== 'lyric') return;
+        const myLineIdx = lineCount++;
+        const chordIndices = new Map<number, number>();
+        line.tokens.forEach((tok, tIdx) => {
+          if (tok.chord) {
+            const myChordIdx = chordCount++;
+            chordIndices.set(tIdx, myChordIdx);
+            chordToLine.set(myChordIdx, myLineIdx);
+          }
+        });
+        lineMeta.set(`${sIdx}-${lIdx}`, { lineIdx: myLineIdx, chordIndices });
+      });
+    });
+
+    return { lineCount, chordCount, lineMeta, chordToLine };
+  }, [lyricSections]);
+
+  const isPlayerActive = isPlaying || currentBeat > 0;
+  const playbackProgress = totalBeats > 0 ? Math.max(0, Math.min(0.9999, currentBeat / totalBeats)) : 0;
+
+  const activeLyricChordIdx = useMemo(() => {
+    if (!isPlayerActive || lyricPlaybackIndex.chordCount === 0) return -1;
+    return Math.floor(playbackProgress * lyricPlaybackIndex.chordCount);
+  }, [isPlayerActive, playbackProgress, lyricPlaybackIndex.chordCount]);
+
+  const activeLyricLineIdx = useMemo(() => {
+    if (!isPlayerActive || lyricPlaybackIndex.lineCount === 0) return -1;
+    if (activeLyricChordIdx >= 0) {
+      const fromChord = lyricPlaybackIndex.chordToLine.get(activeLyricChordIdx);
+      if (fromChord !== undefined) return fromChord;
+    }
+    return Math.floor(playbackProgress * lyricPlaybackIndex.lineCount);
+  }, [isPlayerActive, activeLyricChordIdx, playbackProgress, lyricPlaybackIndex]);
+
   const uniqueChords = useMemo(() => {
     if (!version) return [];
     return extractUniqueChords(version.lyricsChords, version.abcNotation, transpose);
@@ -872,12 +916,23 @@ export function ReaderView({
                           </pre>
                         );
                       }
+                      const meta = lyricPlaybackIndex.lineMeta.get(`${sIdx}-${idx}`);
+                      const isCurrentLine = meta !== undefined && meta.lineIdx === activeLyricLineIdx;
+
                       return (
                         <div
                           key={idx}
-                          className="flex flex-wrap items-end gap-y-1.5 leading-snug mb-2"
+                          className={`flex flex-wrap items-end gap-y-1.5 leading-snug mb-2 rounded-lg px-2 -mx-2 py-0.5 transition-colors duration-200`}
+                          style={{
+                            backgroundColor: isCurrentLine
+                              ? 'color-mix(in srgb, var(--accent-bg) 55%, transparent)'
+                              : 'transparent',
+                          }}
                         >
                           {line.tokens.map((tok, tIdx) => {
+                            const chordOccIdx = meta?.chordIndices.get(tIdx);
+                            const isCurrentChord =
+                              chordOccIdx !== undefined && chordOccIdx === activeLyricChordIdx;
                             const isMidWord =
                               Boolean(tok.chord) &&
                               tok.text.length > 0 &&
@@ -895,12 +950,11 @@ export function ReaderView({
                                         setSelectedChordPreview(tok.rawChord);
                                       }
                                     }}
-                                    className={`font-extrabold leading-none mb-0.5 cursor-pointer transition ${isMidWord ? '' : 'mr-1.5'} ${tok.rawChord === activeChord ? 'px-1 py-0.5 rounded' : ''}`}
+                                    className={`font-extrabold leading-none mb-0.5 cursor-pointer transition-all duration-150 ${isMidWord ? '' : 'mr-1.5'} ${isCurrentChord ? 'px-1.5 py-0.5 rounded-md shadow-sm scale-105' : ''}`}
                                     style={{
                                       fontSize: `${Math.max(12, Math.round(lyricsFontSize * 0.82))}px`,
-                                      backgroundColor:
-                                        tok.rawChord === activeChord ? 'var(--accent)' : 'transparent',
-                                      color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
+                                      backgroundColor: isCurrentChord ? 'var(--accent)' : 'transparent',
+                                      color: isCurrentChord ? '#ffffff' : 'var(--accent)',
                                     }}
                                     title="Clicca per ascoltare l'accordo"
                                   >
@@ -909,7 +963,11 @@ export function ReaderView({
                                 ) : (
                                   <span className="h-5" />
                                 )}
-                                <span className="whitespace-pre-wrap">{tok.text || '\u00A0'}</span>
+                                <span
+                                  className={`whitespace-pre-wrap ${isCurrentLine ? 'font-medium' : ''}`}
+                                >
+                                  {tok.text || '\u00A0'}
+                                </span>
                               </span>
                             );
                           })}
