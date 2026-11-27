@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+  /* Botanical & Acoustic Wood Palette: #f0ead2, #dde5b6, #adc178, #a98467, #6c584c */
+  --palette-parchment: #f0ead2;
+  --palette-tea-green: #dde5b6;
+  --palette-olivine: #adc178;
+  --palette-chamoisee: #a98467;
+  --palette-umber: #6c584c;
+
+  --bg-page: light-dark(#f0ead2, #1b1714);
+  --bg-surface: light-dark(#faf7ec, #26201c);
+  --bg-surface-2: light-dark(#e9e2c7, #332b25);
+  --bg-surface-3: light-dark(#dde5b6, #433930);
+  --text-primary: light-dark(#3b3029, #f0ead2);
+  --text-secondary: light-dark(#6c584c, #dde5b6);
+  --text-muted: light-dark(#8b7360, #a98467);
+  --border-color: light-dark(#d8cfaf, #4a3f36);
+  --accent: light-dark(#6c584c, #adc178);
+  --accent-warm: light-dark(#a98467, #dde5b6);
+  --accent-bg: light-dark(#dde5b6, #313822);
+  --accent-hover: light-dark(#56453b, #c2d48f);
+  --sheet-bg: light-dark(#ffffff, #faf7ec);
+  --sheet-ink: #3b3029;
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Native dialog light-dismiss backdrop */
+dialog::backdrop {
+  background-color: rgba(59, 48, 41, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+dialog[open] {
+  color: var(--text-primary);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 0;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  margin: auto;
+  max-height: 90vh;
+  max-width: min(94vw, 48rem);
+  width: 100%;
+  overflow: hidden;
+}
+
+/* abcjs highlight styling */
+.abcjs-highlight {
+  fill: #a98467 !important;
+  stroke: #a98467 !important;
+}
+
+.abcjs-cursor {
+  stroke: #adc178;
+  stroke-width: 2.5px;
+}
+
+/* Print-friendly PDF export */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
