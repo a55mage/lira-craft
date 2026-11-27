@@ -1,6 +1,7 @@
 import { Midi } from '@tonejs/midi';
 import JSZip from 'jszip';
 import { normalizeChordToAlpha } from './musicTheory';
+import { mergeChordsAboveLyric, sanitizeChordProLine } from './chordPro';
 
 const CHORD_TOKEN_RE =
   /^(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?(?:m|min|maj|dim|aug|sus[24]?|add\d+|7|9|11|13|6|5|maj7|m7|m9)?(?:\/(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?)?$/i;
@@ -64,16 +65,23 @@ export function parseSmartText(rawText: string): SmartImportResult {
       continue;
     }
 
-    // Section headers like [Verse 1], [Ritornello], Intro:
-    if (/^\[(?:Intro|Verse|Strofa|Chorus|Ritornello|Bridge|Ponte|Outro|Solo|Pre-Chorus)[^\]]*\]$/i.test(trimmed)) {
-      outLines.push(`{section: ${trimmed.slice(1, -1)}}`);
+    // Section headers like [Verse 1], [Ritornello], Verse:, Chorus:
+    const bracketSec = trimmed.match(/^\[((?:Intro|Verse|Strofa|Chorus|Ritornello|Bridge|Ponte|Outro|Solo|Pre-Chorus)[^\]]*?)\]:?$/i);
+    if (bracketSec) {
+      outLines.push(`{section: ${bracketSec[1].trim()}}`);
+      continue;
+    }
+    const plainSec = trimmed.match(/^((?:Intro|Verse|Strofa|Chorus|Ritornello|Bridge|Ponte|Outro|Solo|Pre-Chorus)(?:\s*\d+)?)\s*:\s*$/i);
+    if (plainSec) {
+      outLines.push(`{section: ${plainSec[1].trim()}}`);
       continue;
     }
 
     if (hasInlineChords) {
-      // Normalize any Latin chords inside brackets
       outLines.push(
-        line.replace(/\[([^\]]+)\]/g, (_m, c) => `[${normalizeChordToAlpha(c)}]`)
+        sanitizeChordProLine(line).replace(/\[([^\]]+)\]/g, (_m, c) =>
+          CHORD_TOKEN_RE.test(c.trim()) ? `[${normalizeChordToAlpha(c)}]` : `[${c}]`
+        )
       );
       continue;
     }
@@ -82,30 +90,13 @@ export function parseSmartText(rawText: string): SmartImportResult {
     if (isChordLine(line)) {
       const nextLine = lines[i + 1];
       if (nextLine !== undefined && nextLine.trim() && !isChordLine(nextLine)) {
-        // Merge chord positions into nextLine
-        const chordMatches: { index: number; chord: string }[] = [];
-        for (const m of line.matchAll(/\S+/g)) {
-          if (m.index !== undefined) {
-            chordMatches.push({ index: m.index, chord: normalizeChordToAlpha(m[0]) });
-          }
-        }
-        let merged = nextLine;
-        // Insert from right to left so indices stay valid
-        for (let k = chordMatches.length - 1; k >= 0; k--) {
-          const { index, chord } = chordMatches[k];
-          if (index >= merged.length) {
-            merged = `${merged} [${chord}]`;
-          } else {
-            merged = `${merged.slice(0, index)}[${chord}]${merged.slice(index)}`;
-          }
-        }
-        outLines.push(merged);
+        outLines.push(mergeChordsAboveLyric(line, nextLine));
         i++; // skip consumed lyric line
       } else {
         // Standalone chord progression line (e.g. Intro)
         const chords = trimmed
           .split(/\s+/)
-          .map((c) => `[${normalizeChordToAlpha(c)}]`)
+          .map((c) => (CHORD_TOKEN_RE.test(c) ? `[${normalizeChordToAlpha(c)}]` : c))
           .join('  ');
         outLines.push(chords);
       }

@@ -103,6 +103,7 @@ function normalizeTrack(raw: unknown, idx: number): Track {
     timeSignature: typeof obj.timeSignature === 'string' && obj.timeSignature.trim() ? obj.timeSignature.trim() : '4/4',
     tags: Array.isArray(obj.tags) ? obj.tags.filter((t): t is string => typeof t === 'string') : [],
     isFavorite: Boolean(obj.isFavorite),
+    coverArt: typeof obj.coverArt === 'string' && obj.coverArt.startsWith('data:image/') ? obj.coverArt : undefined,
     versions,
     createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : now,
     updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : now,

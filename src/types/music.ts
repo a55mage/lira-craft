@@ -25,6 +25,7 @@ export interface Track {
   timeSignature: string; // e.g., "4/4", "3/4"
   tags: string[];
   isFavorite: boolean;
+  coverArt?: string; // Compact base64 data URL (e.g. 96x96 JPEG)
   versions: TrackVersion[];
   createdAt: string;
   updatedAt: string;

@@ -16,7 +16,7 @@ class SpartitoDatabase extends Dexie {
 export const db = new SpartitoDatabase();
 
 const SEED_FLAG = 'spartito_seeded_v2';
-const BOOKMARKS_SEED_FLAG = 'spartito_ukulele_bm_v2';
+const BOOKMARKS_SEED_FLAG = 'spartito_ukulele_bm_v3';
 
 export async function ensureSeeded(): Promise<void> {
   const count = await db.tracks.count();

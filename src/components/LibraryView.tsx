@@ -3,6 +3,7 @@ import {
   ArrowUpDown,
   Copy,
   Edit3,
+  Grid2x2,
   Heart,
   LayoutGrid,
   List,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { Difficulty, Instrument, Track } from '../types/music';
 import { deleteTrack, restoreDemoTracks, saveTrack, toggleFavorite } from '../db/database';
-import { INSTRUMENT_NAME, InstrumentIcon, InstrumentMonogram } from './InstrumentIcon';
+import { INSTRUMENT_NAME, InstrumentIcon, TrackCover } from './InstrumentIcon';
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -22,7 +23,7 @@ interface LibraryViewProps {
 }
 
 type SortOption = 'date_desc' | 'date_asc' | 'title_asc' | 'artist_asc';
-type ViewMode = 'compact_cards' | 'list';
+type ViewMode = 'minimal_cards' | 'compact_cards' | 'list';
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   beginner: 'Principiante',
@@ -180,16 +181,29 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             Preferiti
           </button>
 
-          {/* View Mode Toggle: Compact Cards vs List */}
+          {/* View Mode Toggle: Minimal Cards vs Compact Cards vs List */}
           <div
             className="inline-flex rounded-xl p-0.5 border"
             style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
           >
             <button
               type="button"
+              onClick={() => setViewMode('minimal_cards')}
+              aria-label="Card essenziali (ultra-compatte)"
+              title="Card essenziali (senza info secondarie)"
+              className="p-1.5 rounded-lg transition cursor-pointer"
+              style={{
+                backgroundColor: viewMode === 'minimal_cards' ? 'var(--bg-surface)' : 'transparent',
+                color: viewMode === 'minimal_cards' ? 'var(--accent)' : 'var(--text-secondary)',
+              }}
+            >
+              <Grid2x2 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => setViewMode('compact_cards')}
               aria-label="Visualizzazione card compatte"
-              title="Card compatte"
+              title="Card con dettagli"
               className="p-1.5 rounded-lg transition cursor-pointer"
               style={{
                 backgroundColor: viewMode === 'compact_cards' ? 'var(--bg-surface)' : 'transparent',
@@ -248,6 +262,50 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             </button>
           </div>
         </div>
+      ) : viewMode === 'minimal_cards' ? (
+        /* ULTRA-COMPACT MINIMAL CARDS (Album art + Title + Artist + Favorite only) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+          {filteredAndSorted.map((track) => {
+            const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
+            return (
+              <div
+                key={track.id}
+                className="rounded-xl border p-2.5 flex items-center gap-2.5 music-paper transition-colors hover:border-[var(--accent)]"
+                style={{ borderColor: 'var(--border-color)' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onOpenTrack(track.id)}
+                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer group"
+                >
+                  <TrackCover
+                    coverArt={track.coverArt}
+                    title={track.title}
+                    instrument={primaryInst}
+                    size="md"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-display font-semibold text-sm leading-tight truncate group-hover:underline">
+                      {track.title}
+                    </h2>
+                    <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      {track.artist}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void toggleFavorite(track.id)}
+                  aria-label={track.isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+                  className="p-1 rounded cursor-pointer shrink-0"
+                  style={{ color: track.isFavorite ? '#a98467' : 'var(--text-muted)' }}
+                >
+                  <Heart className={`w-3.5 h-3.5 ${track.isFavorite ? 'fill-current' : ''}`} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       ) : viewMode === 'list' ? (
         /* LIST VIEW */
         <div
@@ -264,7 +322,12 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                 style={{ borderColor: 'var(--border-color)' }}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <InstrumentMonogram instrument={primaryInst} size="sm" />
+                  <TrackCover
+                    coverArt={track.coverArt}
+                    title={track.title}
+                    instrument={primaryInst}
+                    size="sm"
+                  />
 
                   <button
                     type="button"
@@ -376,7 +439,12 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
               >
                 <div className="space-y-2.5">
                   <div className="flex items-start gap-2.5">
-                    <InstrumentMonogram instrument={primaryInst} size="md" />
+                    <TrackCover
+                      coverArt={track.coverArt}
+                      title={track.title}
+                      instrument={primaryInst}
+                      size="md"
+                    />
                     <button
                       type="button"
                       onClick={() => onOpenTrack(track.id)}

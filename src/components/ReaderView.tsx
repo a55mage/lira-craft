@@ -29,7 +29,7 @@ import { audioEngine, buildTimelineFromChordPro, parseAbcToTimeline } from '../l
 import { ChordDiagramCard } from './ChordDiagramCard';
 import { SheetMusicPanel } from './SheetMusicPanel';
 import { SimplyPianoPanel, type WaitModeSource } from './SimplyPianoPanel';
-import { INSTRUMENT_NAME, InstrumentIcon, InstrumentMonogram } from './InstrumentIcon';
+import { INSTRUMENT_NAME, InstrumentIcon, TrackCover } from './InstrumentIcon';
 
 interface LyricSectionGroup {
   title?: string;
@@ -456,7 +456,12 @@ export function ReaderView({
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <InstrumentMonogram instrument={version.instrument} size="lg" />
+          <TrackCover
+            coverArt={track.coverArt}
+            title={track.title}
+            instrument={version.instrument}
+            size="lg"
+          />
           <div className="min-w-0">
             <h1 className="font-display text-xl sm:text-2xl font-bold truncate leading-tight">
               {track.title}
@@ -883,39 +888,61 @@ export function ReaderView({
                       if (line.type === 'empty') {
                         return <div key={idx} className="h-2" />;
                       }
+                      if (line.type === 'tab') {
+                        return (
+                          <pre
+                            key={idx}
+                            className="font-mono text-xs leading-tight overflow-x-auto py-0.5 px-2 rounded"
+                            style={{
+                              backgroundColor: 'var(--bg-surface-2)',
+                              color: 'var(--text-primary)',
+                            }}
+                          >
+                            {line.rawText}
+                          </pre>
+                        );
+                      }
                       return (
                         <div
                           key={idx}
                           className="flex flex-wrap items-end gap-y-1.5 leading-snug mb-2"
                         >
-                          {line.tokens.map((tok, tIdx) => (
-                            <span key={tIdx} className="inline-flex flex-col items-start">
-                              {tok.chord ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (tok.rawChord) {
-                                      audioEngine.playChord(tok.rawChord, version.instrument);
-                                      setSelectedChordPreview(tok.rawChord);
-                                    }
-                                  }}
-                                  className="font-extrabold px-1.5 py-0.5 rounded mb-0.5 mr-1 cursor-pointer transition hover:scale-105"
-                                  style={{
-                                    fontSize: `${Math.max(11, Math.round(lyricsFontSize * 0.78))}px`,
-                                    backgroundColor:
-                                      tok.rawChord === activeChord ? 'var(--accent)' : 'var(--accent-bg)',
-                                    color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
-                                  }}
-                                  title="Clicca per ascoltare l'accordo"
-                                >
-                                  {tok.chord}
-                                </button>
-                              ) : (
-                                <span className="h-5" />
-                              )}
-                              <span className="whitespace-pre-wrap">{tok.text || '\u00A0'}</span>
-                            </span>
-                          ))}
+                          {line.tokens.map((tok, tIdx) => {
+                            const isMidWord =
+                              Boolean(tok.chord) &&
+                              tok.text.length > 0 &&
+                              !tok.text.startsWith(' ') &&
+                              tIdx > 0 &&
+                              !line.tokens[tIdx - 1].text.endsWith(' ');
+                            return (
+                              <span key={tIdx} className="inline-flex flex-col items-start">
+                                {tok.chord ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (tok.rawChord) {
+                                        audioEngine.playChord(tok.rawChord, version.instrument);
+                                        setSelectedChordPreview(tok.rawChord);
+                                      }
+                                    }}
+                                    className={`font-extrabold px-1.5 py-0.5 rounded mb-0.5 cursor-pointer transition hover:scale-105 ${isMidWord ? '' : 'mr-1'}`}
+                                    style={{
+                                      fontSize: `${Math.max(11, Math.round(lyricsFontSize * 0.78))}px`,
+                                      backgroundColor:
+                                        tok.rawChord === activeChord ? 'var(--accent)' : 'var(--accent-bg)',
+                                      color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
+                                    }}
+                                    title="Clicca per ascoltare l'accordo"
+                                  >
+                                    {tok.chord}
+                                  </button>
+                                ) : (
+                                  <span className="h-5" />
+                                )}
+                                <span className="whitespace-pre-wrap">{tok.text || '\u00A0'}</span>
+                              </span>
+                            );
+                          })}
                         </div>
                       );
                     })}

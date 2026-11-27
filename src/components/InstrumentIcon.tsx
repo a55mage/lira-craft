@@ -89,3 +89,37 @@ export function InstrumentMonogram({
     </div>
   );
 }
+
+export function TrackCover({
+  coverArt,
+  title,
+  instrument,
+  size = 'md',
+}: {
+  coverArt?: string;
+  title: string;
+  instrument: Instrument;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  if (!coverArt) {
+    return <InstrumentMonogram instrument={instrument} size={size} />;
+  }
+
+  const dims =
+    size === 'sm'
+      ? 'w-8 h-8 rounded-lg'
+      : size === 'lg'
+      ? 'w-12 h-12 rounded-xl'
+      : 'w-10 h-10 rounded-xl';
+
+  return (
+    <img
+      src={coverArt}
+      alt={`Copertina di ${title}`}
+      loading="lazy"
+      decoding="async"
+      className={`${dims} object-cover border shrink-0`}
+      style={{ borderColor: 'var(--border-color)' }}
+    />
+  );
+}
