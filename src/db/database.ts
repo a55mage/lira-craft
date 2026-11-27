@@ -17,8 +17,8 @@ class SpartitoDatabase extends Dexie {
 export const db = new SpartitoDatabase();
 
 const SEED_FLAG = 'spartito_seeded_v2';
-const BOOKMARKS_SEED_FLAG = 'spartito_ukulele_bm_v4';
-const SIMPLY_PIANO_SEED_FLAG = 'spartito_simply_piano_v1';
+const BOOKMARKS_SEED_FLAG = 'spartito_ukulele_bm_v5';
+const SIMPLY_PIANO_SEED_FLAG = 'spartito_simply_piano_v2';
 
 export async function ensureSeeded(): Promise<void> {
   const count = await db.tracks.count();
@@ -61,6 +61,13 @@ export async function ensureSeeded(): Promise<void> {
             incomingTracks: data.tracks,
             defaultResolution: 'merge_versions',
           });
+          // Also refresh defaultBpm on already-present Simply Piano tracks
+          for (const t of data.tracks as Track[]) {
+            const existing = await db.tracks.get(t.id);
+            if (existing && t.defaultBpm) {
+              await db.tracks.update(t.id, { defaultBpm: t.defaultBpm });
+            }
+          }
         }
       }
       localStorage.setItem(SIMPLY_PIANO_SEED_FLAG, '1');

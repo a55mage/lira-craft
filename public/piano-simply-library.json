@@ -98,7 +98,7 @@
       "title": "Fireflies",
       "artist": "Owl City",
       "originalKey": "C",
-      "defaultBpm": 120,
+      "defaultBpm": 180,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -114,7 +114,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[F]You would not be[C]lieve your eyes\nIf [G]ten million fireflies\n[F]Lit up the world as [C]I fell a[G]sleep\n[F]'Cause they'd fill the [C]open air\nAnd [G]leave teardrops everywhere\n[F]You'd think me rude, but [C]I would just [G]stand and stare\n\n{section: Ritornello}\n[F]I'd like to make my[C]self be[G]lieve\nThat [Am]planet Earth [F]turns [C]slowly [G]\n[F]It's hard to say that I'd [C]rather stay a[G]wake when I'm a[Am]sleep\n'Cause [F]everything is [C]never as it [G]seems",
-          "abcNotation": "X:1\nT:Fireflies (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=120\nK:C\n\"F\"F A c A | \"C\"E G c G | \"G\"D G B G | \"G\"B G D2 |\n\"F\"A2 c2 | \"C\"G2 E2 | \"G\"D2 G B | \"Am\"A4 |\n\"F\"F A c A | \"C\"G E C E | \"G\"D G B G | \"C\"C4 |]",
+          "abcNotation": "X:1\nT:Fireflies (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=180\nK:C\n\"F\"F A c A | \"C\"E G c G | \"G\"D G B G | \"G\"B G D2 |\n\"F\"A2 c2 | \"C\"G2 E2 | \"G\"D2 G B | \"Am\"A4 |\n\"F\"F A c A | \"C\"G E C E | \"G\"D G B G | \"C\"C4 |]",
           "notes": "Accordi Pop II: arpeggia F - C - G nella strofa per ricreare il synth originale.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -158,7 +158,7 @@
       "title": "A Million Dreams",
       "artist": "B. Pasek & J. Paul",
       "originalKey": "G",
-      "defaultBpm": 100,
+      "defaultBpm": 148,
       "timeSignature": "6/8",
       "tags": [
         "Piano",
@@ -174,7 +174,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[G]I close my eyes and [D]I can see\n[Em]The world that's waiting [C]up for me\n[G]That I call my [D]own\n[G]Through the dark, through the [D]door\n[Em]Through where no one's [C]been before\n[G]But it feels like [D]home\n\n{section: Ritornello}\n'Cause [G]every night I lie in bed\nThe [D]brightest colors fill my head\nA [Em]million dreams are keeping me a[C]wake\n[G]I think of what the world could be\nA [D]vision of the one I see\nA [Em]million dreams is all it's gonna [C]take\nA million dreams for the [G]world we're gonna make",
-          "abcNotation": "X:1\nT:A Million Dreams (Accordi Pop II)\nM:3/4\nL:1/4\nQ:1/4=100\nK:G\n\"G\"G B d | \"D\"F A d | \"Em\"E G B | \"C\"C E G |\n\"G\"B2 d | \"D\"A2 d | \"Em\"G2 B | \"C\"E3 |\n\"G\"G B d | \"D\"A F D | \"Em\"E G B | \"C\"c2 G | \"G\"G3 |]",
+          "abcNotation": "X:1\nT:A Million Dreams (Accordi Pop II)\nM:3/4\nL:1/4\nQ:1/4=148\nK:G\n\"G\"G B d | \"D\"F A d | \"Em\"E G B | \"C\"C E G |\n\"G\"B2 d | \"D\"A2 d | \"Em\"G2 B | \"C\"E3 |\n\"G\"G B d | \"D\"A F D | \"Em\"E G B | \"C\"c2 G | \"G\"G3 |]",
           "notes": "Accordi Pop II: andamento cullato (valzer/6-8) su G - D - Em - C.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -218,7 +218,7 @@
       "title": "Piano Man",
       "artist": "Billy Joel",
       "originalKey": "C",
-      "defaultBpm": 120,
+      "defaultBpm": 177,
       "timeSignature": "3/4",
       "tags": [
         "Piano",
@@ -234,7 +234,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\nIt's [C]nine o'clock [G]on a Satur[F]day [C]\nThe [F]regular crowd [C]shuffles [D7]in [G]\nThere's an [C]old man [G]sitting [F]next to [C]me\nMaking [F]love to his [G]tonic and [C]gin\n\n{section: Ritornello}\n[C]Sing us a song, you're the [G]piano man\n[F]Sing us a song to[C]night\nWell we're [F]all in the mood for a [C]melo[D7]dy\nAnd [F]you've got us [G]feeling al[C]right",
-          "abcNotation": "X:1\nT:Piano Man (Essenziale I)\nM:3/4\nL:1/4\nQ:1/4=120\nK:C\n\"C\"G2 E | \"G\"D2 B, | \"F\"C2 A, | \"C\"G,3 |\n\"F\"A2 F | \"C\"G2 E | \"D7\"F2 D | \"G\"G3 |\n\"C\"E G c | \"G\"B G D | \"F\"A F C | \"C\"E3 |\n\"F\"F A c | \"G\"B G D | \"C\"C3 |]",
+          "abcNotation": "X:1\nT:Piano Man (Essenziale I)\nM:3/4\nL:1/4\nQ:1/4=177\nK:C\n\"C\"G2 E | \"G\"D2 B, | \"F\"C2 A, | \"C\"G,3 |\n\"F\"A2 F | \"C\"G2 E | \"D7\"F2 D | \"G\"G3 |\n\"C\"E G c | \"G\"B G D | \"F\"A F C | \"C\"E3 |\n\"F\"F A c | \"G\"B G D | \"C\"C3 |]",
           "notes": "Essenziale I: classico valzer in 3/4 con basso discendente C - G - F - C.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -248,7 +248,7 @@
       "title": "Basket Case",
       "artist": "Green Day",
       "originalKey": "C",
-      "defaultBpm": 170,
+      "defaultBpm": 175,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -264,7 +264,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[C]Do you have the [G]time to [Am]listen to me [Em]whine\nA[F]bout nothing and [C]everything all at [G]once?\n[C]I am one of [G]those me[Am]lodramatic [Em]fools\nNeu[F]rotic to the [C]bone, no doubt a[G]bout it\n\n{section: Ritornello}\n[F]Sometimes I [G]give myself the [C]creeps\n[F]Sometimes my [G]mind plays tricks on [C]me\nIt [F]all keeps adding [G]up, I [C]think I'm cracking [Am]up\nAm [F]I just para[G]noid, or am I just [C]stoned?",
-          "abcNotation": "X:1\nT:Basket Case (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=140\nK:C\n\"C\"C E G E | \"G\"B, D G D | \"Am\"A, C E C | \"Em\"E G B G |\n\"F\"F A c A | \"C\"E G c G | \"G\"D G B G | \"G\"G4 |\n\"F\"F2 A c | \"G\"G2 B d | \"C\"c2 G E | \"Am\"A4 |\n\"F\"F2 A2 | \"G\"G2 B2 | \"C\"c4 |]",
+          "abcNotation": "X:1\nT:Basket Case (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=175\nK:C\n\"C\"C E G E | \"G\"B, D G D | \"Am\"A, C E C | \"Em\"E G B G |\n\"F\"F A c A | \"C\"E G c G | \"G\"D G B G | \"G\"G4 |\n\"F\"F2 A c | \"G\"G2 B d | \"C\"c2 G E | \"Am\"A4 |\n\"F\"F2 A2 | \"G\"G2 B2 | \"C\"c4 |]",
           "notes": "Accordi Pop II: classico giro Pachelbel in chiave pop-punk (C - G - Am - Em - F - C - G).",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -278,7 +278,7 @@
       "title": "Can't Help Falling In Love",
       "artist": "Elvis Presley",
       "originalKey": "C",
-      "defaultBpm": 100,
+      "defaultBpm": 101,
       "timeSignature": "3/4",
       "tags": [
         "Piano",
@@ -294,7 +294,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[C]Wise [Em]men [Am]say, only [F]fools [C]rush [G]in\nBut [F]I [G]can't [Am]help [F]falling in [C]love [G]with [C]you\n[C]Shall [Em]I [Am]stay? Would it [F]be [C]a [G]sin\nIf [F]I [G]can't [Am]help [F]falling in [C]love [G]with [C]you?\n\n{section: Bridge}\n[Em]Like a river [B7]flows, [Em]surely to the [B7]sea\n[Em]Darling so it [B7]goes, [Em]some things [A7]are meant to [Dm]be [G]\n\n{section: Ritornello}\n[C]Take [Em]my [Am]hand, take my [F]whole [C]life [G]too\nFor [F]I [G]can't [Am]help [F]falling in [C]love [G]with [C]you",
-          "abcNotation": "X:1\nT:Can't Help Falling In Love (Accordi Pop II)\nM:3/4\nL:1/4\nQ:1/4=96\nK:C\n\"C\"C2 G | \"Em\"B,2 G | \"Am\"A,2 E | \"F\"F2 C |\n\"C\"E2 G | \"G\"D3 | \"F\"F G A | \"G\"G2 F |\n\"Am\"E2 C | \"F\"F2 A | \"C\"G2 E | \"G\"D2 B, | \"C\"C3 |]",
+          "abcNotation": "X:1\nT:Can't Help Falling In Love (Accordi Pop II)\nM:3/4\nL:1/4\nQ:1/4=101\nK:C\n\"C\"C2 G | \"Em\"B,2 G | \"Am\"A,2 E | \"F\"F2 C |\n\"C\"E2 G | \"G\"D3 | \"F\"F G A | \"G\"G2 F |\n\"Am\"E2 C | \"F\"F2 A | \"C\"G2 E | \"G\"D2 B, | \"C\"C3 |]",
           "notes": "Accordi Pop II: ballad lenta in 3/4 con arpeggio dolce su C - Em - Am - F - G.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -338,7 +338,7 @@
       "title": "Let Her Go",
       "artist": "Passenger",
       "originalKey": "G",
-      "defaultBpm": 76,
+      "defaultBpm": 149,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -354,7 +354,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Ritornello}\nWell you only need the [C]light when it's burning [G]low\nOnly miss the [D]sun when it starts to [Em]snow\nOnly know you [C]love her when you let her [G]go [D]\nOnly know you've [C]been high when you're feeling [G]low\nOnly hate the [D]road when you're missing [Em]home\nOnly know you [C]love her when you let her [G]go [D]\nAnd you let her [Em]go\n\n{section: Strofa}\n[Em]Staring at the bottom of your [C]glass\n[D]Hoping one day you'll make a [Bm]dream last\n[Em]But dreams come slow and they [C]go so fast [D]",
-          "abcNotation": "X:1\nT:Let Her Go (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=76\nK:G\n\"C\"c2 G E | \"G\"B2 G D | \"D\"A2 F D | \"Em\"G2 E B, |\n\"C\"E G c G | \"G\"D G B G | \"D\"F A d A | \"Em\"E4 |]",
+          "abcNotation": "X:1\nT:Let Her Go (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=149\nK:G\n\"C\"c2 G E | \"G\"B2 G D | \"D\"A2 F D | \"Em\"G2 E B, |\n\"C\"E G c G | \"G\"D G B G | \"D\"F A d A | \"Em\"E4 |]",
           "notes": "Accordi Pop II: ballad acustica lenta su C - G - D - Em, perfetta per praticare i cambi fluidi.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -368,7 +368,7 @@
       "title": "Hello",
       "artist": "Adele",
       "originalKey": "Em",
-      "defaultBpm": 79,
+      "defaultBpm": 158,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -384,7 +384,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[Em]Hello, [G]it's [D]me [C]\n[Em]I was wondering if [G]after all these [D]years you'd like to [C]meet\n[Em]To go [G]over [D]every[C]thing\nThey say that [Em]time's supposed to [G]heal ya, but I ain't [D]done much heal[C]ing\n\n{section: Ritornello}\n[Em]Hello from the [C]other [G]side [D]\n[Em]I must've called a [C]thousand [G]times [D]\nTo [Em]tell you I'm [C]sorry for [G]everything that I've [D]done\nBut when I [Em]call you [C]never seem to [G]be home [D]",
-          "abcNotation": "X:1\nT:Hello (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=79\nK:Em\n\"Em\"E2 G B | \"G\"G2 B d | \"D\"F2 A d | \"C\"E2 G c |\n\"Em\"B2 G E | \"C\"c2 G E | \"G\"B2 G D | \"D\"A4 |\n\"Em\"E2 B2 | \"C\"c2 G2 | \"G\"B2 D2 | \"D\"A4 |]",
+          "abcNotation": "X:1\nT:Hello (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=158\nK:Em\n\"Em\"E2 G B | \"G\"G2 B d | \"D\"F2 A d | \"C\"E2 G c |\n\"Em\"B2 G E | \"C\"c2 G E | \"G\"B2 G D | \"D\"A4 |\n\"Em\"E2 B2 | \"C\"c2 G2 | \"G\"B2 D2 | \"D\"A4 |]",
           "notes": "Accordi Pop II: accordi pieni e sostenuti Em - G - D - C con grande espressività.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -428,7 +428,7 @@
       "title": "Someone Like You",
       "artist": "Adele",
       "originalKey": "G",
-      "defaultBpm": 68,
+      "defaultBpm": 135,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -444,7 +444,7 @@
           "difficulty": "intermediate",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[G]I heard that you're [D]settled down\n[Em]That you found a girl and you're [C]married now\n[G]I heard that your [D]dreams came true\n[Em]Guess she gave you things I didn't [C]give to you\n\n{section: Ritornello}\n[G]Never mind, I'll find [D]someone like [Em]you [C]\nI wish [G]nothing but the [D]best for [Em]you, too [C]\nDon't for[G]get me, I [D]beg, I'll re[Em]member you [C]said\nSometimes it [G]lasts in love, but [D]sometimes it hurts in[Em]stead [C]",
-          "abcNotation": "X:1\nT:Someone Like You (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=68\nK:G\n\"G\"G B d B | \"D\"F A d A | \"Em\"E G B G | \"C\"E G c G |\n\"G\"B2 d2 | \"D\"A2 F2 | \"Em\"G2 B2 | \"C\"c4 |\n\"G\"G B d B | \"D\"F A d A | \"Em\"E G B G | \"C\"C4 |]",
+          "abcNotation": "X:1\nT:Someone Like You (Accordi Pop II)\nM:4/4\nL:1/4\nQ:1/4=135\nK:G\n\"G\"G B d B | \"D\"F A d A | \"Em\"E G B G | \"C\"E G c G |\n\"G\"B2 d2 | \"D\"A2 F2 | \"Em\"G2 B2 | \"C\"c4 |\n\"G\"G B d B | \"D\"F A d A | \"Em\"E G B G | \"C\"C4 |]",
           "notes": "Accordi Pop II: iconico arpeggio continuo in ottavi su G - D - Em - C.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -488,7 +488,7 @@
       "title": "Knocking On Heaven's Door",
       "artist": "Bob Dylan",
       "originalKey": "G",
-      "defaultBpm": 69,
+      "defaultBpm": 140,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -504,7 +504,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[G]Mama, take this [D]badge off of [Am]me\n[G]I can't [D]use it any[C]more\n[G]It's getting dark, too [D]dark to [Am]see\n[G]I feel I'm knocking on [D]heaven's [C]door\n\n{section: Ritornello}\n[G]Knock, knock, knocking on [D]heaven's [Am]door\n[G]Knock, knock, knocking on [D]heaven's [C]door\n[G]Knock, knock, knocking on [D]heaven's [Am]door\n[G]Knock, knock, knocking on [D]heaven's [C]door",
-          "abcNotation": "X:1\nT:Knocking On Heaven's Door (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=69\nK:G\n\"G\"G2 B2 | \"D\"A2 F2 | \"Am\"A4 | \"Am\"c2 A2 |\n\"G\"G2 B2 | \"D\"A2 F2 | \"C\"c4 | \"C\"G2 E2 |\n\"G\"B2 G2 | \"D\"A2 F2 | \"Am\"E4 | \"C\"C4 |]",
+          "abcNotation": "X:1\nT:Knocking On Heaven's Door (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=140\nK:G\n\"G\"G2 B2 | \"D\"A2 F2 | \"Am\"A4 | \"Am\"c2 A2 |\n\"G\"G2 B2 | \"D\"A2 F2 | \"C\"c4 | \"C\"G2 E2 |\n\"G\"B2 G2 | \"D\"A2 F2 | \"Am\"E4 | \"C\"C4 |]",
           "notes": "Accordi Pop I: uno dei migliori brani per iniziare! Alterna G - D - Am e G - D - C.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -547,7 +547,7 @@
       "title": "Butter",
       "artist": "BTS",
       "originalKey": "C",
-      "defaultBpm": 110,
+      "defaultBpm": 103,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -563,7 +563,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[C]Smooth like butter, like a [Am]criminal undercover\n[F]Gon' pop like trouble breaking [G]into your heart like that\n[C]Cool shade stunner, yeah I [Am]owe it all to my mother\n[F]Hot like summer, yeah I'm [G]making you sweat like that\n\n{section: Ritornello}\n[C]Side step, right-left, to my [Am]beat\n[F]High like the moon, rock with [G]me, baby\n[C]Know that I got that [Am]heat\n[F]Let me show you 'cause talk is [G]cheap",
-          "abcNotation": "X:1\nT:Butter (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=110\nK:C\n\"C\"C E G c | \"Am\"A, C E A | \"F\"F A c A | \"G\"G B d B |\n\"C\"G2 E C | \"Am\"A2 E C | \"F\"F2 A c | \"G\"B4 |]",
+          "abcNotation": "X:1\nT:Butter (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=103\nK:C\n\"C\"C E G c | \"Am\"A, C E A | \"F\"F A c A | \"G\"G B d B |\n\"C\"G2 E C | \"Am\"A2 E C | \"F\"F2 A c | \"G\"B4 |]",
           "notes": "Accordi Pop I: pop groovy tutto su tasti bianchi (C - Am - F - G).",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -667,7 +667,7 @@
       "title": "Safe And Sound",
       "artist": "Capital Cities",
       "originalKey": "C",
-      "defaultBpm": 118,
+      "defaultBpm": 122,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -683,7 +683,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Strofa}\n[F]I could lift you [C]up\n[Am]I could show you what you wanna [G]see and take you where you wanna [F]be\nYou could be my [C]luck\n[Am]Even if the sky is falling [G]down, I know that we'll be safe and [F]sound\n\n{section: Ritornello}\n[F]We're safe and [C]sound [Am] [G]\n[F]I know that we'll be safe and [C]sound [Am] [G]",
-          "abcNotation": "X:1\nT:Safe And Sound (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=118\nK:C\n\"F\"F A c A | \"C\"E G c G | \"Am\"A c e c | \"G\"G B d B |\n\"F\"A2 c2 | \"C\"G2 E2 | \"Am\"A2 E2 | \"G\"G4 |]",
+          "abcNotation": "X:1\nT:Safe And Sound (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=122\nK:C\n\"F\"F A c A | \"C\"E G c G | \"Am\"A c e c | \"G\"G B d B |\n\"F\"A2 c2 | \"C\"G2 E2 | \"Am\"A2 E2 | \"G\"G4 |]",
           "notes": "Accordi Pop I: 4 accordi tasti bianchi F - C - Am - G in loop energetico.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -697,7 +697,7 @@
       "title": "Nuvole Bianche",
       "artist": "Ludovico Einaudi",
       "originalKey": "Am",
-      "defaultBpm": 92,
+      "defaultBpm": 142,
       "timeSignature": "4/4",
       "tags": [
         "Piano",
@@ -713,7 +713,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Tema A (Strumentale Piano)}\n[Am]  [F]  [C]  [G]\n[Am]  [F]  [C]  [G]\n\n{section: Tema B (Crescendo)}\n[Am]  [F]  [C]  [G]\n[Dm]  [F]  [C]  [G]  [Am]",
-          "abcNotation": "X:1\nT:Nuvole Bianche (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=92\nK:Am\n\"Am\"E A c e | \"F\"F A c f | \"C\"E G c e | \"G\"D G B d |\n\"Am\"e2 c A | \"F\"f2 c A | \"C\"e2 c G | \"G\"d2 B G |\n\"Am\"A c e c | \"F\"F A c A | \"C\"G c e c | \"G\"B G D2 | \"Am\"A4 |]",
+          "abcNotation": "X:1\nT:Nuvole Bianche (Accordi Pop I)\nM:4/4\nL:1/4\nQ:1/4=142\nK:Am\n\"Am\"E A c e | \"F\"F A c f | \"C\"E G c e | \"G\"D G B d |\n\"Am\"e2 c A | \"F\"f2 c A | \"C\"e2 c G | \"G\"d2 B G |\n\"Am\"A c e c | \"F\"F A c A | \"C\"G c e c | \"G\"B G D2 | \"Am\"A4 |]",
           "notes": "Accordi Pop I (Strumentale): giro emotivo Am - F - C - G con arpeggi morbidi e melodia cantabile.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
@@ -743,7 +743,7 @@
           "difficulty": "beginner",
           "capo": 0,
           "lyricsChords": "{section: Intro (Tema Sax)}\n[Dm]  [Gm]  [Bb]  [Am]\n\n{section: Ritornello}\n[Dm]I'm never gonna dance again\n[Gm]Guilty feet have got no rhythm\n[Bb]Though it's easy to pretend\n[Am]I know you're not a fool\n[Dm]Should've known better than to cheat a friend\n[Gm]And waste the chance that I've been given\n[Bb]So I'm never gonna dance again\nThe [Am]way I danced with [Dm]you",
-          "abcNotation": "X:1\nT:Careless Whisper (Essenziale I)\nM:4/4\nL:1/4\nQ:1/4=130\nK:Dm\n\"Dm\"e2 d A | \"Dm\"F4 | \"Gm\"e2 d A | \"Gm\"G4 |\n\"Bb\"c2 _B F | \"Bb\"D4 | \"Am\"A2 G E | \"Am\"E4 |\n\"Dm\"D F A d | \"Gm\"G _B d B | \"Bb\"F _B d B | \"Am\"E A c A | \"Dm\"D4 |]",
+          "abcNotation": "X:1\nT:Careless Whisper (Essenziale I)\nM:4/4\nL:1/4\nQ:1/4=153\nK:Dm\n\"Dm\"e2 d A | \"Dm\"F4 | \"Gm\"e2 d A | \"Gm\"G4 |\n\"Bb\"c2 _B F | \"Bb\"D4 | \"Am\"A2 G E | \"Am\"E4 |\n\"Dm\"D F A d | \"Gm\"G _B d B | \"Bb\"F _B d B | \"Am\"E A c A | \"Dm\"D4 |]",
           "notes": "Essenziale I: melodia celebre del sax nella mano destra su Dm - Gm - Bb - Am.",
           "updatedAt": "2026-11-27T15:14:58.190435+00:00"
         }
