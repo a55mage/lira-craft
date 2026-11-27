@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { Mic, Piano, Radio } from 'lucide-react';
 import type { Instrument, NotationSystem } from '../types/music';
 import type { TimelineEvent } from '../lib/audioEngine';
 import type { ParsedLine } from '../lib/chordPro';
 import { audioEngine } from '../lib/audioEngine';
 import { formatChord, midiToNoteName } from '../lib/musicTheory';
 import { getFrettedDiagram, STRING_LABELS } from '../lib/chordDiagrams';
+
+export type WaitModeSource = 'off' | 'mic' | 'midi';
 
 interface SimplyPianoPanelProps {
   events: TimelineEvent[];
@@ -15,6 +18,12 @@ interface SimplyPianoPanelProps {
   activeEvent: TimelineEvent | null;
   activeChord: string | null;
   parsedLyrics: ParsedLine[];
+  waitMode: WaitModeSource;
+  onChangeWaitMode: (mode: WaitModeSource) => void;
+  waitingForMidi: number | null;
+  detectedLiveMidi: number | null;
+  waitModeStatus: string | null;
+  onUserNotePlayed: (midi: number) => void;
   onSeekBeat: (beat: number) => void;
 }
 
@@ -31,11 +40,16 @@ export function SimplyPianoPanel({
   activeEvent,
   activeChord,
   parsedLyrics,
+  waitMode,
+  onChangeWaitMode,
+  waitingForMidi,
+  detectedLiveMidi,
+  waitModeStatus,
+  onUserNotePlayed,
   onSeekBeat,
 }: SimplyPianoPanelProps) {
   const activeMidis = useMemo(() => new Set(activeEvent?.midiNotes ?? []), [activeEvent]);
 
-  // Extract singable lyric lines for the live karaoke strip inside the guided player
   const lyricLines = useMemo(() => {
     return parsedLyrics.filter(
       (line) =>
@@ -50,7 +64,6 @@ export function SimplyPianoPanel({
     return Math.floor(progress * lyricLines.length);
   }, [lyricLines.length, currentBeat, totalBeats]);
 
-  // Window of upcoming beats shown on the scrolling highway (Simply Piano style)
   const WINDOW_BEATS = 8;
   const visibleEvents = useMemo(() => {
     return events.filter(
@@ -74,6 +87,13 @@ export function SimplyPianoPanel({
   const currentLine = currentLyricIndex >= 0 ? lyricLines[currentLyricIndex] : null;
   const nextLine = currentLyricIndex >= 0 ? lyricLines[currentLyricIndex + 1] ?? null : null;
 
+  // Keep MIDI availability hint clean
+  const midiSupported = typeof navigator !== 'undefined' && 'requestMIDIAccess' in navigator;
+
+  useEffect(() => {
+    // no-op placeholder to keep hook order stable
+  }, []);
+
   return (
     <div
       className="rounded-2xl border overflow-hidden"
@@ -82,18 +102,69 @@ export function SimplyPianoPanel({
         borderColor: 'var(--border-color)',
       }}
     >
-      {/* Header bar */}
+      {/* Header bar with Wait Mode selector */}
       <div
         className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b text-xs"
         style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
       >
-        <div className="flex items-center gap-2 font-semibold">
+        <div className="flex flex-wrap items-center gap-2 font-semibold">
           <span
             className="inline-block w-2 h-2 rounded-full animate-pulse"
             style={{ backgroundColor: '#adc178' }}
           />
-          Player Guidato (Simply Piano Mode)
+          <span>Player Guidato (Simply Piano)</span>
+
+          {/* Wait Mode Controls (Off / Mic / USB MIDI) */}
+          <div
+            className="inline-flex items-center rounded-lg p-0.5 border ml-1"
+            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+            title="Wait Mode: lo spartito attende che tu suoni la nota giusta prima di avanzare"
+          >
+            <button
+              type="button"
+              onClick={() => onChangeWaitMode('off')}
+              className="px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer transition"
+              style={{
+                backgroundColor: waitMode === 'off' ? 'var(--accent)' : 'transparent',
+                color: waitMode === 'off' ? '#ffffff' : 'var(--text-secondary)',
+              }}
+            >
+              Auto
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeWaitMode(waitMode === 'mic' ? 'off' : 'mic')}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer transition"
+              style={{
+                backgroundColor: waitMode === 'mic' ? 'var(--accent)' : 'transparent',
+                color: waitMode === 'mic' ? '#ffffff' : 'var(--text-secondary)',
+              }}
+              title="Attendi la nota ascoltando dal microfono"
+            >
+              <Mic className="w-3 h-3" />
+              Wait Mic
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeWaitMode(waitMode === 'midi' ? 'off' : 'midi')}
+              disabled={!midiSupported}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer transition disabled:opacity-40"
+              style={{
+                backgroundColor: waitMode === 'midi' ? 'var(--accent)' : 'transparent',
+                color: waitMode === 'midi' ? '#ffffff' : 'var(--text-secondary)',
+              }}
+              title={
+                midiSupported
+                  ? 'Attendi la nota dalla tastiera USB MIDI'
+                  : 'Web MIDI non supportato da questo browser (usa Chrome/Edge)'
+              }
+            >
+              <Piano className="w-3 h-3" />
+              Wait MIDI
+            </button>
+          </div>
         </div>
+
         <div className="flex items-center gap-3">
           {activeChord && (
             <span
@@ -108,6 +179,41 @@ export function SimplyPianoPanel({
           </span>
         </div>
       </div>
+
+      {/* Wait Mode Live Status Strip */}
+      {waitMode !== 'off' && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b text-xs"
+          style={{ backgroundColor: 'var(--accent-bg)', borderColor: 'var(--border-color)' }}
+        >
+          <div className="flex items-center gap-2 font-medium">
+            <Radio className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--accent)' }} />
+            <span>
+              {waitingForMidi !== null ? (
+                <>
+                  In attesa della nota:{' '}
+                  <strong className="px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-surface)' }}>
+                    {midiToNoteName(waitingForMidi, notation)}
+                  </strong>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    (suona sul tuo strumento o clicca il tasto evidenziato)
+                  </span>
+                </>
+              ) : (
+                waitModeStatus || 'Wait Mode attivo — premi Riproduci per iniziare'
+              )}
+            </span>
+          </div>
+          {detectedLiveMidi !== null && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+              style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--accent)' }}
+            >
+              Rilevato: {midiToNoteName(detectedLiveMidi, notation)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Live Lyrics Strip inside Guided Player */}
       {currentLine && (
@@ -138,7 +244,7 @@ export function SimplyPianoPanel({
         </div>
       )}
 
-      {/* Scrolling Note Highway (left-to-right playhead at 18%) */}
+      {/* Scrolling Note Highway */}
       <div
         className="relative h-32 overflow-hidden select-none cursor-pointer"
         style={{ backgroundColor: 'var(--bg-page)' }}
@@ -150,7 +256,6 @@ export function SimplyPianoPanel({
         }}
         title="Clicca sulla barra per saltare a una battuta"
       >
-        {/* Subtle horizontal staff guide lines */}
         {[20, 40, 60, 80, 100].map((top) => (
           <div
             key={top}
@@ -171,7 +276,6 @@ export function SimplyPianoPanel({
           <div className="w-3 h-3 -ml-[5px] -mt-0.5 rounded-full" style={{ backgroundColor: '#a98467' }} />
         </div>
 
-        {/* Scrolling Note / Chord blocks */}
         {visibleEvents.map((ev) => {
           const leftPct = 18 + ((ev.startBeat - currentBeat) / WINDOW_BEATS) * 82;
           const widthPct = Math.max(4, (ev.durationBeats / WINDOW_BEATS) * 82 - 0.8);
@@ -224,22 +328,29 @@ export function SimplyPianoPanel({
             style={{ borderColor: 'var(--border-color)' }}
           >
             {whiteKeys.map((midi) => {
-              const isLit = activeMidis.has(midi);
+              const isTarget = waitingForMidi !== null && midi % 12 === waitingForMidi % 12;
+              const isLit = activeMidis.has(midi) || isTarget;
+              const isUserPressed = detectedLiveMidi !== null && midi === detectedLiveMidi;
               const label = midiToNoteName(midi, notation).replace(/\d+$/, '');
               const hasBlackRight = BLACK_KEY_PCS.has((midi + 1) % 12) && midi + 1 <= PIANO_END_MIDI;
               const blackMidi = midi + 1;
-              const isBlackLit = activeMidis.has(blackMidi);
+              const isBlackLit =
+                activeMidis.has(blackMidi) ||
+                (waitingForMidi !== null && blackMidi % 12 === waitingForMidi % 12);
 
               return (
                 <div key={midi} className="relative flex-1 min-w-[26px] h-full">
                   <button
                     type="button"
-                    onClick={() => audioEngine.playNote(midi, 0.7, 'piano')}
+                    onClick={() => {
+                      audioEngine.playNote(midi, 0.7, 'piano');
+                      onUserNotePlayed(midi);
+                    }}
                     className="w-full h-full border-r flex items-end justify-center pb-1.5 text-[10px] font-semibold transition cursor-pointer"
                     style={{
                       borderColor: '#d8cfaf',
-                      backgroundColor: isLit ? '#adc178' : '#faf7ec',
-                      color: isLit ? '#3b3029' : '#6c584c',
+                      backgroundColor: isUserPressed ? '#a98467' : isLit ? '#adc178' : '#faf7ec',
+                      color: isUserPressed ? '#ffffff' : isLit ? '#3b3029' : '#6c584c',
                     }}
                   >
                     {label}
@@ -250,6 +361,7 @@ export function SimplyPianoPanel({
                       onClick={(e) => {
                         e.stopPropagation();
                         audioEngine.playNote(blackMidi, 0.7, 'piano');
+                        onUserNotePlayed(blackMidi);
                       }}
                       aria-label={midiToNoteName(blackMidi, notation)}
                       className="absolute top-0 -right-[32%] w-[64%] h-[60%] z-10 rounded-b-md border transition cursor-pointer"
@@ -264,7 +376,6 @@ export function SimplyPianoPanel({
             })}
           </div>
         ) : (
-          /* Horizontal interactive fretboard for Guitar / Ukulele */
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium">

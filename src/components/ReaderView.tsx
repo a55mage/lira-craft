@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AArrowDown,
   AArrowUp,
+  AlignJustify,
   ArrowLeft,
   ChevronDown,
+  Columns2,
   Edit3,
   Eye,
   Gauge,
@@ -18,13 +20,14 @@ import {
   Square,
   Timer,
 } from 'lucide-react';
+import { PitchDetector } from 'pitchy';
 import type { NotationSystem, ReaderModules, Track } from '../types/music';
 import { extractUniqueChords, parseChordPro } from '../lib/chordPro';
 import { formatChord, suggestBestCapo, transposeChord } from '../lib/musicTheory';
 import { audioEngine, buildTimelineFromChordPro, parseAbcToTimeline } from '../lib/audioEngine';
 import { ChordDiagramCard } from './ChordDiagramCard';
 import { SheetMusicPanel } from './SheetMusicPanel';
-import { SimplyPianoPanel } from './SimplyPianoPanel';
+import { SimplyPianoPanel, type WaitModeSource } from './SimplyPianoPanel';
 
 interface ReaderViewProps {
   track: Track;
@@ -67,7 +70,16 @@ export function ReaderView({
   const [performanceMode, setPerformanceMode] = useState(false);
   const [selectedChordPreview, setSelectedChordPreview] = useState<string | null>(null);
   const [lyricsFontSize, setLyricsFontSize] = useState(16);
+  const [lyricsColumns, setLyricsColumns] = useState<1 | 2>(1);
 
+  // Wait Mode state (USB MIDI / Microphone)
+  const [waitMode, setWaitMode] = useState<WaitModeSource>('off');
+  const [waitingEventId, setWaitingEventId] = useState<number | null>(null);
+  const [detectedLiveMidi, setDetectedLiveMidi] = useState<number | null>(null);
+  const [waitModeStatus, setWaitModeStatus] = useState<string | null>(null);
+
+  const satisfiedEventIdsRef = useRef<Set<number>>(new Set());
+  const waitingEventRef = useRef<{ id: number; midi: number } | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   const baseBpm = version?.bpmOverride || track.defaultBpm || 100;
@@ -122,7 +134,135 @@ export function ReaderView({
     return last ?? uniqueChords[0] ?? null;
   }, [timeline, currentBeat, uniqueChords]);
 
-  // Playback loop (requestAnimationFrame driven, beat-accurate)
+  const waitingForMidi = useMemo(() => {
+    if (waitingEventId === null) return null;
+    const ev = timeline.find((e) => e.id === waitingEventId);
+    return ev?.midiNotes[0] ?? null;
+  }, [timeline, waitingEventId]);
+
+  useEffect(() => {
+    if (waitingEventId !== null && waitingForMidi !== null) {
+      waitingEventRef.current = { id: waitingEventId, midi: waitingForMidi };
+    } else {
+      waitingEventRef.current = null;
+    }
+  }, [waitingEventId, waitingForMidi]);
+
+  const handleUserNotePlayed = useCallback((playedMidi: number) => {
+    setDetectedLiveMidi(playedMidi);
+    const waiting = waitingEventRef.current;
+    if (!waiting) return;
+    // Match by pitch class so beginners can play in any octave
+    if (playedMidi % 12 === waiting.midi % 12) {
+      satisfiedEventIdsRef.current.add(waiting.id);
+      waitingEventRef.current = null;
+      setWaitingEventId(null);
+    }
+  }, []);
+
+  // Wait Mode Input Listener: Web MIDI API or Microphone Pitch Detection
+  useEffect(() => {
+    if (waitMode === 'off') {
+      setWaitModeStatus(null);
+      setDetectedLiveMidi(null);
+      setWaitingEventId(null);
+      satisfiedEventIdsRef.current.clear();
+      return;
+    }
+
+    let cancelled = false;
+
+    if (waitMode === 'midi') {
+      if (!('requestMIDIAccess' in navigator)) {
+        setWaitModeStatus('Web MIDI non supportato in questo browser.');
+        return;
+      }
+      let midiAccess: MIDIAccess | null = null;
+      const onMidiMessage = (event: MIDIMessageEvent) => {
+        const data = event.data;
+        if (!data || data.length < 3) return;
+        const [status, note, velocity] = data;
+        if ((status & 0xf0) === 0x90 && velocity > 0) {
+          handleUserNotePlayed(note);
+        }
+      };
+
+      void navigator
+        .requestMIDIAccess()
+        .then((access) => {
+          if (cancelled) return;
+          midiAccess = access;
+          const inputs = Array.from(access.inputs.values());
+          inputs.forEach((input) => {
+            input.onmidimessage = onMidiMessage;
+          });
+          setWaitModeStatus(
+            inputs.length > 0
+              ? `MIDI connesso (${inputs.map((i) => i.name).join(', ')})`
+              : 'Nessuna tastiera MIDI USB rilevata (puoi anche cliccare i tasti sullo schermo)'
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setWaitModeStatus('Accesso MIDI negato dal browser.');
+        });
+
+      return () => {
+        cancelled = true;
+        if (midiAccess) {
+          Array.from(midiAccess.inputs.values()).forEach((input) => {
+            input.onmidimessage = null;
+          });
+        }
+      };
+    }
+
+    if (waitMode === 'mic') {
+      let stream: MediaStream | null = null;
+      let rafId = 0;
+
+      void navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((s) => {
+          if (cancelled) {
+            s.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          stream = s;
+          const ctx = audioEngine.getContext();
+          const source = ctx.createMediaStreamSource(s);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+
+          const detector = PitchDetector.forFloat32Array(analyser.fftSize);
+          const buf = new Float32Array(detector.inputLength);
+          setWaitModeStatus('Microfono attivo — suona la nota richiesta per avanzare');
+
+          const listen = () => {
+            if (cancelled) return;
+            analyser.getFloatTimeDomainData(buf);
+            const [pitch, clarity] = detector.findPitch(buf, ctx.sampleRate);
+            if (clarity > 0.85 && pitch > 70 && pitch < 1200) {
+              const nearestMidi = Math.round(69 + 12 * Math.log2(pitch / 440));
+              handleUserNotePlayed(nearestMidi);
+            }
+            rafId = requestAnimationFrame(listen);
+          };
+          rafId = requestAnimationFrame(listen);
+        })
+        .catch(() => {
+          if (!cancelled) setWaitModeStatus('Permesso microfono negato.');
+        });
+
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(rafId);
+        stream?.getTracks().forEach((t) => t.stop());
+      };
+    }
+  }, [waitMode, handleUserNotePlayed]);
+
+  // Playback loop
   const lastTriggeredEventId = useRef<number>(-1);
   const lastMetronomeBeat = useRef<number>(-1);
 
@@ -135,6 +275,13 @@ export function ReaderView({
     const tick = (now: number) => {
       const dtSec = (now - lastTime) / 1000;
       lastTime = now;
+
+      // In Wait Mode, pause time advancement while waiting for user input on the current note
+      if (waitMode !== 'off' && waitingEventRef.current !== null) {
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
       const deltaBeats = dtSec * (effectiveBpm / 60);
 
       setCurrentBeat((prev) => {
@@ -146,9 +293,11 @@ export function ReaderView({
           next = loopStartBeat;
           lastTriggeredEventId.current = -1;
           lastMetronomeBeat.current = -1;
+          satisfiedEventIdsRef.current.clear();
         } else if (next >= totalBeats) {
           setIsPlaying(false);
           lastTriggeredEventId.current = -1;
+          satisfiedEventIdsRef.current.clear();
           return 0;
         }
 
@@ -162,6 +311,14 @@ export function ReaderView({
 
         const ev = timeline.find((e) => next >= e.startBeat && next < e.startBeat + e.durationBeats);
         if (ev && ev.id !== lastTriggeredEventId.current) {
+          // If Wait Mode is active and this note hasn't been played yet, hold right on it
+          if (waitMode !== 'off' && !satisfiedEventIdsRef.current.has(ev.id)) {
+            const targetMidi = ev.midiNotes[0] ?? 60;
+            waitingEventRef.current = { id: ev.id, midi: targetMidi };
+            setWaitingEventId(ev.id);
+            return ev.startBeat;
+          }
+
           lastTriggeredEventId.current = ev.id;
           const durSec = (ev.durationBeats * 60) / effectiveBpm;
           ev.midiNotes.forEach((m) => audioEngine.playNote(m, durSec, version.instrument));
@@ -178,7 +335,7 @@ export function ReaderView({
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, effectiveBpm, totalBeats, timeline, version, metronomeOn, loopEnabled, loopStartBar, loopEndBar]);
+  }, [isPlaying, effectiveBpm, totalBeats, timeline, version, metronomeOn, loopEnabled, loopStartBar, loopEndBar, waitMode]);
 
   // Auto-scroll for lyrics view
   useEffect(() => {
@@ -224,6 +381,9 @@ export function ReaderView({
   const handleStop = () => {
     setIsPlaying(false);
     setCurrentBeat(loopEnabled ? (loopStartBar - 1) * 4 : 0);
+    setWaitingEventId(null);
+    waitingEventRef.current = null;
+    satisfiedEventIdsRef.current.clear();
     lastTriggeredEventId.current = -1;
     lastMetronomeBeat.current = -1;
   };
@@ -237,7 +397,7 @@ export function ReaderView({
   if (!version) return null;
 
   return (
-    <div className={`mx-auto px-4 py-5 space-y-4 ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
+    <div className={`mx-auto px-4 pt-5 pb-24 space-y-4 ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
       {/* Top Header & Version Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-3 min-w-0">
@@ -266,8 +426,7 @@ export function ReaderView({
             <select
               value={version.id}
               onChange={(e) => {
-                setIsPlaying(false);
-                setCurrentBeat(0);
+                handleStop();
                 setVersionId(e.target.value);
               }}
               aria-label="Seleziona versione brano"
@@ -329,7 +488,6 @@ export function ReaderView({
           className="rounded-2xl border p-3.5 space-y-3 no-print"
           style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
         >
-          {/* Row 1: Modular Views & Notation */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-medium mr-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
@@ -362,81 +520,17 @@ export function ReaderView({
               })}
             </div>
 
-            {/* Notation Toggle: ABC vs Do-Re-Mi */}
-            <div
-              className="inline-flex rounded-xl p-0.5 border text-xs font-medium"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-            >
-              <button
-                type="button"
-                onClick={() => onChangeNotation('alpha')}
-                className="px-2.5 py-1 rounded-lg transition cursor-pointer"
-                style={{
-                  backgroundColor: notation === 'alpha' ? 'var(--bg-surface)' : 'transparent',
-                  color: notation === 'alpha' ? 'var(--accent)' : 'var(--text-secondary)',
-                }}
-              >
-                C · D · E
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeNotation('latin')}
-                className="px-2.5 py-1 rounded-lg transition cursor-pointer"
-                style={{
-                  backgroundColor: notation === 'latin' ? 'var(--bg-surface)' : 'transparent',
-                  color: notation === 'latin' ? 'var(--accent)' : 'var(--text-secondary)',
-                }}
-              >
-                Do · Re · Mi
-              </button>
-            </div>
-          </div>
-
-          {/* Row 2: Player, Speed, Transpose, Loop, Metronome */}
-          <div
-            className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t"
-            style={{ borderColor: 'var(--border-color)' }}
-          >
-            {/* Transport */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePlayToggle}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                style={{ backgroundColor: 'var(--accent)' }}
-              >
-                {countInRemaining > 0 ? (
-                  <>Conto: {countInRemaining}...</>
-                ) : isPlaying ? (
-                  <>
-                    <Pause className="w-4 h-4" /> Pausa
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" /> Riproduci
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleStop}
-                aria-label="Stop"
-                className="p-2 rounded-xl border cursor-pointer"
-                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-              >
-                <Square className="w-3.5 h-3.5" />
-              </button>
-
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Metronome, Count-in, Loop */}
               <button
                 type="button"
                 onClick={() => setMetronomeOn((v) => !v)}
-                className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl border text-xs font-medium cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer"
                 style={{
                   backgroundColor: metronomeOn ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
                   borderColor: metronomeOn ? 'var(--accent)' : 'var(--border-color)',
                   color: metronomeOn ? 'var(--accent)' : 'var(--text-primary)',
                 }}
-                title="Metronomo durante la riproduzione"
               >
                 <Timer className="w-3.5 h-3.5" /> Metronomo
               </button>
@@ -444,7 +538,7 @@ export function ReaderView({
               <button
                 type="button"
                 onClick={() => setCountInOn((v) => !v)}
-                className="px-2.5 py-2 rounded-xl border text-xs font-medium cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer"
                 style={{
                   backgroundColor: countInOn ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
                   borderColor: countInOn ? 'var(--accent)' : 'var(--border-color)',
@@ -454,108 +548,84 @@ export function ReaderView({
               >
                 1-2-3-4
               </button>
-            </div>
 
-            {/* Speed control */}
-            <div className="flex items-center gap-2 text-xs">
-              <Gauge className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-              <span className="font-medium w-10">{speedPct}%</span>
-              <input
-                type="range"
-                min={50}
-                max={150}
-                step={5}
-                value={speedPct}
-                onChange={(e) => setSpeedPct(Number(e.target.value))}
-                aria-label="Velocità di riproduzione"
-                className="w-24"
-                style={{ accentColor: 'var(--accent)' }}
-              />
-              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                ({effectiveBpm} BPM)
-              </span>
-            </div>
-
-            {/* Transpose */}
-            <div className="flex items-center gap-1.5 text-xs">
-              <Music2 className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-              <span>Trasponi:</span>
-              <button
-                type="button"
-                onClick={() => setTranspose((t) => t - 1)}
-                className="w-7 h-7 rounded-lg border font-bold cursor-pointer"
-                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-semibold">
-                {transpose > 0 ? `+${transpose}` : transpose}
-              </span>
-              <button
-                type="button"
-                onClick={() => setTranspose((t) => t + 1)}
-                className="w-7 h-7 rounded-lg border font-bold cursor-pointer"
-                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-              >
-                +
-              </button>
-              {transpose !== 0 && (
+              <div className="flex items-center gap-1 text-xs">
                 <button
                   type="button"
-                  onClick={() => setTranspose(0)}
-                  title="Ripristina tonalità originale"
-                  className="p-1.5 rounded-lg cursor-pointer opacity-70 hover:opacity-100"
+                  onClick={() => setLoopEnabled((v) => !v)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border font-medium cursor-pointer"
+                  style={{
+                    backgroundColor: loopEnabled ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
+                    borderColor: loopEnabled ? 'var(--accent)' : 'var(--border-color)',
+                    color: loopEnabled ? 'var(--accent)' : 'var(--text-primary)',
+                  }}
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <Repeat className="w-3.5 h-3.5" /> Loop
                 </button>
-              )}
-            </div>
+                {loopEnabled && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalBars}
+                      value={loopStartBar}
+                      onChange={(e) => setLoopStartBar(Math.max(1, Number(e.target.value)))}
+                      aria-label="Battuta inizio loop"
+                      className="w-11 px-1 py-0.5 rounded border text-center"
+                      style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+                    />
+                    <span>–</span>
+                    <input
+                      type="number"
+                      min={loopStartBar}
+                      max={totalBars}
+                      value={loopEndBar}
+                      onChange={(e) => setLoopEndBar(Math.max(loopStartBar, Number(e.target.value)))}
+                      aria-label="Battuta fine loop"
+                      className="w-11 px-1 py-0.5 rounded border text-center"
+                      style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+                    />
+                  </>
+                )}
+              </div>
 
-            {/* Loop A-B */}
-            <div className="flex items-center gap-1.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setLoopEnabled((v) => !v)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border font-medium cursor-pointer"
-                style={{
-                  backgroundColor: loopEnabled ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
-                  borderColor: loopEnabled ? 'var(--accent)' : 'var(--border-color)',
-                  color: loopEnabled ? 'var(--accent)' : 'var(--text-primary)',
-                }}
+              {/* Notation Toggle: ABC vs Do-Re-Mi */}
+              <div
+                className="inline-flex rounded-xl p-0.5 border text-xs font-medium"
+                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
               >
-                <Repeat className="w-3.5 h-3.5" /> Loop
-              </button>
-              {loopEnabled && (
-                <>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalBars}
-                    value={loopStartBar}
-                    onChange={(e) => setLoopStartBar(Math.max(1, Number(e.target.value)))}
-                    aria-label="Battuta inizio loop"
-                    className="w-12 px-1.5 py-1 rounded border text-center"
-                    style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-                  />
-                  <span>–</span>
-                  <input
-                    type="number"
-                    min={loopStartBar}
-                    max={totalBars}
-                    value={loopEndBar}
-                    onChange={(e) => setLoopEndBar(Math.max(loopStartBar, Number(e.target.value)))}
-                    aria-label="Battuta fine loop"
-                    className="w-12 px-1.5 py-1 rounded border text-center"
-                    style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-                  />
-                </>
-              )}
+                <button
+                  type="button"
+                  onClick={() => onChangeNotation('alpha')}
+                  className="px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  style={{
+                    backgroundColor: notation === 'alpha' ? 'var(--bg-surface)' : 'transparent',
+                    color: notation === 'alpha' ? 'var(--accent)' : 'var(--text-secondary)',
+                  }}
+                >
+                  C · D · E
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeNotation('latin')}
+                  className="px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  style={{
+                    backgroundColor: notation === 'latin' ? 'var(--bg-surface)' : 'transparent',
+                    color: notation === 'latin' ? 'var(--accent)' : 'var(--text-secondary)',
+                  }}
+                >
+                  Do · Re · Mi
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Beginner tip & Capo calculator */}
           {(version.notes || (capoSuggestion && capoSuggestion.capo > 0)) && (
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs" style={{ borderColor: 'var(--border-color)' }}>
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
               {version.notes && (
                 <div style={{ color: 'var(--text-secondary)' }}>
                   💡 <strong>Consiglio studio:</strong> {version.notes}
@@ -598,7 +668,7 @@ export function ReaderView({
         </div>
       )}
 
-      {/* Module 2: Simply Piano Interactive Player (now with live Lyrics!) */}
+      {/* Module 2: Simply Piano Interactive Player (with Lyrics + Wait Mode MIDI/Mic) */}
       {modules.simplyPiano && (
         <SimplyPianoPanel
           events={timeline}
@@ -609,8 +679,17 @@ export function ReaderView({
           activeEvent={activeEvent}
           activeChord={activeChord}
           parsedLyrics={parsedLyrics}
+          waitMode={waitMode}
+          onChangeWaitMode={setWaitMode}
+          waitingForMidi={waitingForMidi}
+          detectedLiveMidi={detectedLiveMidi}
+          waitModeStatus={waitModeStatus}
+          onUserNotePlayed={handleUserNotePlayed}
           onSeekBeat={(beat) => {
             setCurrentBeat(beat);
+            setWaitingEventId(null);
+            waitingEventRef.current = null;
+            satisfiedEventIdsRef.current.clear();
             lastTriggeredEventId.current = -1;
           }}
         />
@@ -627,7 +706,7 @@ export function ReaderView({
         />
       )}
 
-      {/* Module 4: Lyrics + Chords with Sticky Right Chord Diagrams & Font Zoom */}
+      {/* Module 4: Lyrics + Chords (1 or 2 columns + Font Zoom + Sticky Right Chord Diagrams) */}
       {modules.lyricsChords && (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_272px] gap-4 items-start">
           {/* Lyrics Column */}
@@ -642,7 +721,42 @@ export function ReaderView({
             >
               <h2 className="text-sm font-semibold">Testo & Accordi</h2>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* 1-Column / 2-Column Layout Switch */}
+                <div
+                  className="inline-flex items-center rounded-xl p-0.5 border text-xs"
+                  style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setLyricsColumns(1)}
+                    aria-label="1 colonna"
+                    title="Layout a 1 colonna"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer transition"
+                    style={{
+                      backgroundColor: lyricsColumns === 1 ? 'var(--bg-surface)' : 'transparent',
+                      color: lyricsColumns === 1 ? 'var(--accent)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    <AlignJustify className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">1 col</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLyricsColumns(2)}
+                    aria-label="2 colonne"
+                    title="Layout a 2 colonne (stile leggio)"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer transition"
+                    style={{
+                      backgroundColor: lyricsColumns === 2 ? 'var(--bg-surface)' : 'transparent',
+                      color: lyricsColumns === 2 ? 'var(--accent)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    <Columns2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">2 col</span>
+                  </button>
+                </div>
+
                 {/* Font Size Controls */}
                 <div
                   className="inline-flex items-center gap-1 rounded-xl border px-1.5 py-0.5 text-xs"
@@ -675,32 +789,22 @@ export function ReaderView({
                     <AArrowUp className="w-4 h-4" />
                   </button>
                 </div>
-
-                <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoScroll}
-                    onChange={(e) => setAutoScroll(e.target.checked)}
-                    style={{ accentColor: 'var(--accent)' }}
-                  />
-                  Auto-scroll
-                </label>
               </div>
             </div>
 
             <div
-              className="space-y-3 leading-relaxed"
+              className={`leading-relaxed ${lyricsColumns === 2 ? 'md:columns-2 md:gap-8' : 'space-y-3'}`}
               style={{ fontSize: `${performanceMode ? Math.max(lyricsFontSize, 20) : lyricsFontSize}px` }}
             >
               {parsedLyrics.map((line, idx) => {
                 if (line.type === 'empty') {
-                  return <div key={idx} className="h-2.5" />;
+                  return <div key={idx} className="h-3" />;
                 }
                 if (line.type === 'section') {
                   return (
                     <div
                       key={idx}
-                      className="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md mt-2"
+                      className="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md mt-2 mb-1 break-after-avoid"
                       style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
                     >
                       {line.sectionTitle}
@@ -708,7 +812,10 @@ export function ReaderView({
                   );
                 }
                 return (
-                  <div key={idx} className="flex flex-wrap items-end gap-y-2 leading-snug">
+                  <div
+                    key={idx}
+                    className="flex flex-wrap items-end gap-y-1.5 leading-snug mb-2.5 break-inside-avoid"
+                  >
                     {line.tokens.map((tok, tIdx) => (
                       <span key={tIdx} className="inline-flex flex-col items-start">
                         {tok.chord ? (
@@ -743,10 +850,10 @@ export function ReaderView({
             </div>
           </div>
 
-          {/* Sticky Right Chord Diagrams Sidebar (always visible while scrolling lyrics) */}
+          {/* Sticky Right Chord Diagrams Sidebar */}
           {uniqueChords.length > 0 && (
             <aside
-              className="lg:sticky lg:top-20 rounded-2xl border p-3.5 space-y-3 max-h-[calc(100vh-6rem)] overflow-y-auto no-print"
+              className="lg:sticky lg:top-20 rounded-2xl border p-3.5 space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto no-print"
               style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
             >
               <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border-color)' }}>
@@ -774,6 +881,136 @@ export function ReaderView({
           )}
         </div>
       )}
+
+      {/* Sticky Floating Bottom Mini-Player Bar (Always reachable while scrolling) */}
+      <div className="fixed bottom-3 inset-x-0 z-30 px-4 pointer-events-none no-print">
+        <div
+          className="max-w-5xl mx-auto rounded-2xl border px-3.5 py-2.5 shadow-xl backdrop-blur-md pointer-events-auto flex flex-wrap items-center justify-between gap-2.5"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--bg-surface) 94%, transparent)',
+            borderColor: 'var(--border-color)',
+          }}
+        >
+          {/* Transport */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handlePlayToggle}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+              style={{ backgroundColor: 'var(--accent)' }}
+            >
+              {countInRemaining > 0 ? (
+                <>Conto: {countInRemaining}</>
+              ) : isPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" /> Pausa
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" /> Play
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleStop}
+              aria-label="Stop"
+              className="p-1.5 rounded-xl border cursor-pointer"
+              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+            >
+              <Square className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Progress Scrubber */}
+          <div className="flex items-center gap-2 flex-1 min-w-[130px] max-w-xs text-[11px]">
+            <input
+              type="range"
+              min={0}
+              max={totalBeats}
+              step={0.5}
+              value={Math.min(totalBeats, currentBeat)}
+              onChange={(e) => {
+                setCurrentBeat(Number(e.target.value));
+                setWaitingEventId(null);
+                waitingEventRef.current = null;
+                satisfiedEventIdsRef.current.clear();
+                lastTriggeredEventId.current = -1;
+              }}
+              aria-label="Posizione brano"
+              className="flex-1"
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            <span className="font-mono shrink-0" style={{ color: 'var(--text-secondary)' }}>
+              {Math.floor(currentBeat / 4) + 1}/{totalBars}
+            </span>
+          </div>
+
+          {/* Speed */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <Gauge className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+            <input
+              type="range"
+              min={50}
+              max={150}
+              step={5}
+              value={speedPct}
+              onChange={(e) => setSpeedPct(Number(e.target.value))}
+              aria-label="Velocità di riproduzione"
+              className="w-16 sm:w-20"
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            <span className="font-mono text-[11px] font-semibold w-9">{speedPct}%</span>
+          </div>
+
+          {/* Transpose */}
+          <div className="flex items-center gap-1 text-xs">
+            <Music2 className="w-3.5 h-3.5 hidden sm:block" style={{ color: 'var(--text-secondary)' }} />
+            <button
+              type="button"
+              onClick={() => setTranspose((t) => t - 1)}
+              aria-label="Abbassa tonalità di 1 semitono"
+              className="w-6 h-6 rounded-lg border font-bold cursor-pointer"
+              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+            >
+              -
+            </button>
+            <span className="w-7 text-center font-mono text-[11px] font-semibold">
+              {transpose > 0 ? `+${transpose}` : transpose}
+            </span>
+            <button
+              type="button"
+              onClick={() => setTranspose((t) => t + 1)}
+              aria-label="Alza tonalità di 1 semitono"
+              className="w-6 h-6 rounded-lg border font-bold cursor-pointer"
+              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+            >
+              +
+            </button>
+            {transpose !== 0 && (
+              <button
+                type="button"
+                onClick={() => setTranspose(0)}
+                title="Ripristina tonalità originale"
+                className="p-1 rounded-lg cursor-pointer opacity-70 hover:opacity-100"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Auto-scroll */}
+          <label className="inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={autoScroll}
+              onChange={(e) => setAutoScroll(e.target.checked)}
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            <span className="hidden sm:inline">Auto-scroll</span>
+          </label>
+        </div>
+      </div>
     </div>
   );
 }
