@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Track } from '../types/music';
 import { DEMO_TRACKS } from './seedData';
+import { applyLibraryImport } from '../lib/libraryJson';
 
 class SpartitoDatabase extends Dexie {
   tracks!: EntityTable<Track, 'id'>;
@@ -17,6 +18,7 @@ export const db = new SpartitoDatabase();
 
 const SEED_FLAG = 'spartito_seeded_v2';
 const BOOKMARKS_SEED_FLAG = 'spartito_ukulele_bm_v4';
+const SIMPLY_PIANO_SEED_FLAG = 'spartito_simply_piano_v1';
 
 export async function ensureSeeded(): Promise<void> {
   const count = await db.tracks.count();
@@ -24,7 +26,6 @@ export async function ensureSeeded(): Promise<void> {
     await db.tracks.bulkPut(DEMO_TRACKS);
     localStorage.setItem(SEED_FLAG, '1');
   } else if (!localStorage.getItem(SEED_FLAG)) {
-    // Ensure newly added demo tracks (e.g. Somebody That I Used to Know) are added without overwriting user edits
     for (const demo of DEMO_TRACKS) {
       const existing = await db.tracks.get(demo.id);
       if (!existing) {
@@ -44,6 +45,25 @@ export async function ensureSeeded(): Promise<void> {
         }
       }
       localStorage.setItem(BOOKMARKS_SEED_FLAG, '1');
+    } catch {
+      // Ignore if optional bundle is unavailable
+    }
+  }
+
+  if (!localStorage.getItem(SIMPLY_PIANO_SEED_FLAG)) {
+    try {
+      const res = await fetch('./piano-simply-library.json');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.tracks) && data.tracks.length > 0) {
+          await applyLibraryImport({
+            mode: 'merge',
+            incomingTracks: data.tracks,
+            defaultResolution: 'merge_versions',
+          });
+        }
+      }
+      localStorage.setItem(SIMPLY_PIANO_SEED_FLAG, '1');
     } catch {
       // Ignore if optional bundle is unavailable
     }
