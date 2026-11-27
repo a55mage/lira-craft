@@ -440,18 +440,18 @@ export function ReaderView({
 
   return (
     <>
-    <div className={`mx-auto px-4 pt-5 pb-24 space-y-4 animate-fade-up ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
-      {/* Top Header & Version Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex items-center gap-3 min-w-0">
+    <div className={`mx-auto px-4 pt-3 pb-20 space-y-3 animate-fade-up ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
+      {/* Compact Track Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 no-print">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={() => {
               setIsPlaying(false);
               onBack();
             }}
-            className="p-2 rounded-xl border cursor-pointer hover:opacity-80"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+            className="p-1.5 rounded-lg cursor-pointer hover:opacity-70"
+            style={{ color: 'var(--text-secondary)' }}
             aria-label="Torna alla libreria"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -460,20 +460,20 @@ export function ReaderView({
             coverArt={track.coverArt}
             title={track.title}
             instrument={version.instrument}
-            size="lg"
+            size="md"
           />
           <div className="min-w-0">
-            <h1 className="font-display text-xl sm:text-2xl font-bold truncate leading-tight">
+            <h1 className="font-display text-lg sm:text-xl font-bold truncate leading-tight">
               {track.title}
             </h1>
-            <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              {track.artist} · Tonalità <strong className="font-mono">{currentKeyDisplay}</strong> ·{' '}
+            <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+              {track.artist} · <strong className="font-mono">{currentKeyDisplay}</strong> ·{' '}
               <span className="font-mono">{effectiveBpm} BPM</span> · {track.timeSignature}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="relative">
             <select
               value={version.id}
@@ -482,11 +482,8 @@ export function ReaderView({
                 setVersionId(e.target.value);
               }}
               aria-label="Seleziona versione brano"
-              className="appearance-none pl-3 pr-8 py-2 rounded-xl border text-xs font-semibold cursor-pointer"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-color)',
-              }}
+              className="appearance-none pl-2 pr-6 py-1 rounded-lg bg-transparent font-semibold cursor-pointer"
+              style={{ color: 'var(--text-primary)' }}
             >
               {track.versions.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -494,16 +491,16 @@ export function ReaderView({
                 </option>
               ))}
             </select>
-            <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+            <ChevronDown className="w-3.5 h-3.5 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
           </div>
 
           <button
             type="button"
             onClick={() => setPerformanceMode((p) => !p)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer"
             style={{
-              backgroundColor: performanceMode ? 'var(--accent-bg)' : 'var(--bg-surface)',
-              borderColor: performanceMode ? 'var(--accent)' : 'var(--border-color)',
+              color: performanceMode ? 'var(--accent)' : 'var(--text-secondary)',
+              backgroundColor: performanceMode ? 'var(--accent-bg)' : 'transparent',
             }}
             title="Modalità Leggio / Mani Libere"
           >
@@ -514,8 +511,8 @@ export function ReaderView({
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer hover:opacity-75"
+            style={{ color: 'var(--text-secondary)' }}
             title="Stampa o salva in PDF"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -525,8 +522,8 @@ export function ReaderView({
           <button
             type="button"
             onClick={() => onEditTrack(track)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer hover:opacity-75"
+            style={{ color: 'var(--accent)' }}
           >
             <Edit3 className="w-3.5 h-3.5" />
             Modifica
@@ -534,23 +531,23 @@ export function ReaderView({
         </div>
       </div>
 
-      {/* Modular Control Strip */}
+      {/* Flat Modular Control Strip (no nested box/pills) */}
       {!performanceMode && (
         <div
-          className="rounded-2xl border p-3.5 space-y-3 no-print"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+          className="pb-2.5 border-b space-y-2 no-print"
+          style={{ borderColor: 'var(--border-color)' }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium mr-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                <Eye className="w-3.5 h-3.5" /> Moduli:
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <Eye className="w-3.5 h-3.5" />
               </span>
               {(
                 [
-                  { key: 'sheet', label: 'Spartito Classico' },
-                  { key: 'simplyPiano', label: 'Player Simply Piano' },
+                  { key: 'sheet', label: 'Spartito' },
+                  { key: 'simplyPiano', label: 'Player Guidato' },
                   { key: 'lyricsChords', label: 'Lyrics + Accordi' },
-                  { key: 'chordBar', label: 'Barra Accordi in alto' },
+                  { key: 'chordBar', label: 'Accordi in alto' },
                 ] as const
               ).map((item) => {
                 const active = modules[item.key];
@@ -559,11 +556,10 @@ export function ReaderView({
                     key={item.key}
                     type="button"
                     onClick={() => toggleModule(item.key)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium border transition cursor-pointer"
+                    className="py-0.5 font-medium border-b-2 transition cursor-pointer"
                     style={{
-                      backgroundColor: active ? 'var(--accent)' : 'var(--bg-surface-2)',
-                      borderColor: active ? 'var(--accent)' : 'var(--border-color)',
-                      color: active ? '#ffffff' : 'var(--text-primary)',
+                      borderColor: active ? 'var(--accent)' : 'transparent',
+                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                     }}
                   >
                     {item.label}
@@ -572,17 +568,12 @@ export function ReaderView({
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Metronome, Count-in, Loop */}
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setMetronomeOn((v) => !v)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer"
-                style={{
-                  backgroundColor: metronomeOn ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
-                  borderColor: metronomeOn ? 'var(--accent)' : 'var(--border-color)',
-                  color: metronomeOn ? 'var(--accent)' : 'var(--text-primary)',
-                }}
+                className="inline-flex items-center gap-1 font-medium cursor-pointer"
+                style={{ color: metronomeOn ? 'var(--accent)' : 'var(--text-muted)' }}
               >
                 <Timer className="w-3.5 h-3.5" /> Metronomo
               </button>
@@ -590,27 +581,19 @@ export function ReaderView({
               <button
                 type="button"
                 onClick={() => setCountInOn((v) => !v)}
-                className="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer"
-                style={{
-                  backgroundColor: countInOn ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
-                  borderColor: countInOn ? 'var(--accent)' : 'var(--border-color)',
-                  color: countInOn ? 'var(--accent)' : 'var(--text-primary)',
-                }}
+                className="font-mono font-medium cursor-pointer"
+                style={{ color: countInOn ? 'var(--accent)' : 'var(--text-muted)' }}
                 title="4 battiti di conteggio prima di iniziare"
               >
                 1-2-3-4
               </button>
 
-              <div className="flex items-center gap-1 text-xs">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setLoopEnabled((v) => !v)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border font-medium cursor-pointer"
-                  style={{
-                    backgroundColor: loopEnabled ? 'var(--accent-bg)' : 'var(--bg-surface-2)',
-                    borderColor: loopEnabled ? 'var(--accent)' : 'var(--border-color)',
-                    color: loopEnabled ? 'var(--accent)' : 'var(--text-primary)',
-                  }}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer"
+                  style={{ color: loopEnabled ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
                   <Repeat className="w-3.5 h-3.5" /> Loop
                 </button>
@@ -623,8 +606,8 @@ export function ReaderView({
                       value={loopStartBar}
                       onChange={(e) => setLoopStartBar(Math.max(1, Number(e.target.value)))}
                       aria-label="Battuta inizio loop"
-                      className="w-11 px-1 py-0.5 rounded border text-center"
-                      style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+                      className="w-10 px-1 py-0.5 rounded border text-center font-mono"
+                      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
                     />
                     <span>–</span>
                     <input
@@ -634,72 +617,59 @@ export function ReaderView({
                       value={loopEndBar}
                       onChange={(e) => setLoopEndBar(Math.max(loopStartBar, Number(e.target.value)))}
                       aria-label="Battuta fine loop"
-                      className="w-11 px-1 py-0.5 rounded border text-center"
-                      style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+                      className="w-10 px-1 py-0.5 rounded border text-center font-mono"
+                      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
                     />
                   </>
                 )}
               </div>
 
-              {/* Notation Toggle: ABC vs Do-Re-Mi */}
-              <div
-                className="inline-flex rounded-xl p-0.5 border text-xs font-medium"
-                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-              >
+              <div className="inline-flex items-center gap-1.5 pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
                 <button
                   type="button"
                   onClick={() => onChangeNotation('alpha')}
-                  className="px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  className="font-medium cursor-pointer"
                   style={{
-                    backgroundColor: notation === 'alpha' ? 'var(--bg-surface)' : 'transparent',
-                    color: notation === 'alpha' ? 'var(--accent)' : 'var(--text-secondary)',
+                    color: notation === 'alpha' ? 'var(--accent)' : 'var(--text-muted)',
+                    textDecoration: notation === 'alpha' ? 'underline' : 'none',
                   }}
                 >
-                  C · D · E
+                  C·D·E
                 </button>
+                <span style={{ color: 'var(--text-muted)' }}>/</span>
                 <button
                   type="button"
                   onClick={() => onChangeNotation('latin')}
-                  className="px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  className="font-medium cursor-pointer"
                   style={{
-                    backgroundColor: notation === 'latin' ? 'var(--bg-surface)' : 'transparent',
-                    color: notation === 'latin' ? 'var(--accent)' : 'var(--text-secondary)',
+                    color: notation === 'latin' ? 'var(--accent)' : 'var(--text-muted)',
+                    textDecoration: notation === 'latin' ? 'underline' : 'none',
                   }}
                 >
-                  Do · Re · Mi
+                  Do·Re·Mi
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Beginner tip & Capo calculator */}
           {(version.notes || (capoSuggestion && capoSuggestion.capo > 0)) && (
-            <div
-              className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs"
-              style={{ borderColor: 'var(--border-color)' }}
-            >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               {version.notes && (
                 <div className="inline-flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <Lightbulb className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent-warm)' }} />
-                  <span>
-                    <strong>Consiglio studio:</strong> {version.notes}
-                  </span>
+                  <span>{version.notes}</span>
                 </div>
               )}
               {capoSuggestion && capoSuggestion.capo > 0 && (
                 <button
                   type="button"
                   onClick={() => setTranspose((t) => t - capoSuggestion.capo)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium cursor-pointer border"
-                  style={{
-                    backgroundColor: 'var(--bg-surface-2)',
-                    borderColor: 'var(--border-color)',
-                    color: 'var(--accent)',
-                  }}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer hover:underline"
+                  style={{ color: 'var(--accent)' }}
                   title="Applica trasposizione per usare il capotasto"
                 >
                   <InstrumentIcon instrument={version.instrument} className="w-3.5 h-3.5" />
-                  Capotasto consigliato: tasto {capoSuggestion.capo} ({capoSuggestion.easyCount}/{capoSuggestion.total} accordi facili)
+                  Capotasto tasto {capoSuggestion.capo} ({capoSuggestion.easyCount}/{capoSuggestion.total} accordi facili)
                 </button>
               )}
             </div>
@@ -925,11 +895,11 @@ export function ReaderView({
                                         setSelectedChordPreview(tok.rawChord);
                                       }
                                     }}
-                                    className={`font-extrabold px-1.5 py-0.5 rounded mb-0.5 cursor-pointer transition hover:scale-105 ${isMidWord ? '' : 'mr-1'}`}
+                                    className={`font-extrabold leading-none mb-0.5 cursor-pointer transition ${isMidWord ? '' : 'mr-1.5'} ${tok.rawChord === activeChord ? 'px-1 py-0.5 rounded' : ''}`}
                                     style={{
-                                      fontSize: `${Math.max(11, Math.round(lyricsFontSize * 0.78))}px`,
+                                      fontSize: `${Math.max(12, Math.round(lyricsFontSize * 0.82))}px`,
                                       backgroundColor:
-                                        tok.rawChord === activeChord ? 'var(--accent)' : 'var(--accent-bg)',
+                                        tok.rawChord === activeChord ? 'var(--accent)' : 'transparent',
                                       color: tok.rawChord === activeChord ? '#ffffff' : 'var(--accent)',
                                     }}
                                     title="Clicca per ascoltare l'accordo"
@@ -952,18 +922,15 @@ export function ReaderView({
             </div>
           </div>
 
-          {/* Sticky Right Chord Diagrams Sidebar */}
+          {/* Sticky Right Chord Diagrams Sidebar (flat divider instead of heavy nested card) */}
           {uniqueChords.length > 0 && (
             <aside
-              className="lg:sticky lg:top-20 rounded-2xl border p-3.5 space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto no-print"
-              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+              className="lg:sticky lg:top-16 lg:border-l lg:pl-4 space-y-2.5 max-h-[calc(100vh-7rem)] overflow-y-auto no-print"
+              style={{ borderColor: 'var(--border-color)' }}
             >
-              <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center justify-between pb-1">
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                   Accordi ({uniqueChords.length})
-                </span>
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  Clicca per ascoltare
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2">

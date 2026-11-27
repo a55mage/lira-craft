@@ -5,8 +5,8 @@ import { db, ensureSeeded } from './db/database';
 import type { NotationSystem, ReaderModules, Track } from './types/music';
 import { LibraryView } from './components/LibraryView';
 import { ReaderView } from './components/ReaderView';
+import { TrackEditorPage } from './components/TrackEditorPage';
 import { LibraryJsonModal } from './components/LibraryJsonModal';
-import { TrackEditorModal } from './components/TrackEditorModal';
 import { ExternalImportModal } from './components/ExternalImportModal';
 import { TunerModal } from './components/TunerModal';
 
@@ -29,21 +29,19 @@ function getInitialColorScheme(): 'light' | 'dark' | null {
   }
 }
 
+type PageView =
+  | { kind: 'library' }
+  | { kind: 'reader'; trackId: string; versionId?: string }
+  | { kind: 'editor'; track: Track | null; returnToTrackId?: string };
+
 export default function App() {
   const tracks = useLiveQuery(() => db.tracks.toArray(), []) ?? [];
 
-  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
-  const [activeVersionId, setActiveVersionId] = useState<string | undefined>(undefined);
-
+  const [page, setPage] = useState<PageView>({ kind: 'library' });
   const [jsonModalOpen, setJsonModalOpen] = useState(false);
   const [tunerOpen, setTunerOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
-  const [editorState, setEditorState] = useState<{ open: boolean; track: Track | null }>({
-    open: false,
-    track: null,
-  });
 
-  // Preferences (notation + modular panels)
   const [notation, setNotation] = useState<NotationSystem>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
@@ -62,7 +60,6 @@ export default function App() {
     }
   });
 
-  // Two-state color-scheme override synced with <meta name="color-scheme"> and storage events
   const [schemeOverride, setSchemeOverride] = useState<'light' | 'dark' | null>(getInitialColorScheme);
 
   useEffect(() => {
@@ -113,11 +110,12 @@ export default function App() {
     }
   };
 
-  const activeTrack = activeTrackId ? tracks.find((t) => t.id === activeTrackId) ?? null : null;
+  const activeTrack =
+    page.kind === 'reader' ? tracks.find((t) => t.id === page.trackId) ?? null : null;
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Global Top Navbar */}
+      {/* Compact, Flat Top Navbar */}
       <header
         className="sticky top-0 z-30 border-b backdrop-blur-md no-print"
         style={{
@@ -125,40 +123,32 @@ export default function App() {
           borderColor: 'var(--border-color)',
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="max-w-7xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2.5 min-w-0">
             <button
               type="button"
-              onClick={() => setActiveTrackId(null)}
-              className="flex items-center gap-2 font-bold text-base tracking-tight cursor-pointer shrink-0"
+              onClick={() => setPage({ kind: 'library' })}
+              className="flex items-center gap-2 font-bold tracking-tight cursor-pointer shrink-0"
             >
               <span
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
                 style={{ backgroundColor: 'var(--accent)' }}
               >
-                <Music className="w-4 h-4" />
+                <Music className="w-3.5 h-3.5" />
               </span>
-              <span className="font-display text-lg tracking-tight">Lira Craft</span>
+              <span className="font-display text-base sm:text-lg tracking-tight">Lira Craft</span>
             </button>
 
-            <span
-              className="px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0"
-              style={{
-                backgroundColor: 'var(--bg-surface-2)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)',
-              }}
-              title="Numero totale di brani in libreria"
-            >
+            <span className="text-xs font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
               {tracks.length} {tracks.length === 1 ? 'brano' : 'brani'}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              onClick={() => setEditorState({ open: true, track: null })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer transition hover:opacity-90 shrink-0"
+              onClick={() => setPage({ kind: 'editor', track: null })}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90 shrink-0"
               style={{ backgroundColor: 'var(--accent)' }}
               title="Crea un nuovo brano"
             >
@@ -169,8 +159,8 @@ export default function App() {
             <button
               type="button"
               onClick={() => setImporterOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium cursor-pointer hover:opacity-85 shrink-0"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
+              style={{ color: 'var(--text-secondary)' }}
               title="Importa spartito da sito o file"
             >
               <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent-warm)' }} />
@@ -180,22 +170,22 @@ export default function App() {
             <button
               type="button"
               onClick={() => setJsonModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium cursor-pointer hover:opacity-85 shrink-0"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
+              style={{ color: 'var(--text-secondary)' }}
               title="Esporta, importa o fai merge della libreria JSON"
             >
-              <FileJson className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+              <FileJson className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">JSON</span>
             </button>
 
             <button
               type="button"
               onClick={() => setTunerOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium cursor-pointer hover:opacity-85 shrink-0"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
+              style={{ color: 'var(--text-secondary)' }}
               title="Apri accordatore"
             >
-              <Mic className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+              <Mic className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Accordatore</span>
             </button>
 
@@ -204,8 +194,8 @@ export default function App() {
               onClick={toggleColorScheme}
               aria-label="Cambia tema chiaro/scuro"
               title="Cambia tema chiaro/scuro"
-              className="p-2 rounded-xl border cursor-pointer hover:opacity-85 shrink-0"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              className="p-1.5 rounded-lg cursor-pointer hover:opacity-75 shrink-0"
+              style={{ color: 'var(--text-secondary)' }}
             >
               {schemeOverride === 'dark' ? (
                 <Sun className="w-4 h-4" />
@@ -219,56 +209,57 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1">
-        {activeTrack ? (
+        {page.kind === 'editor' ? (
+          <TrackEditorPage
+            key={page.track?.id ?? 'new'}
+            initialTrack={page.track}
+            notation={notation}
+            onCancel={() =>
+              page.returnToTrackId
+                ? setPage({ kind: 'reader', trackId: page.returnToTrackId })
+                : setPage({ kind: 'library' })
+            }
+            onSaved={(saved) =>
+              setPage({ kind: 'reader', trackId: saved.id, versionId: saved.versions[0]?.id })
+            }
+            onDeleted={() => setPage({ kind: 'library' })}
+          />
+        ) : page.kind === 'reader' && activeTrack ? (
           <ReaderView
             key={activeTrack.id}
             track={activeTrack}
-            initialVersionId={activeVersionId}
+            initialVersionId={page.versionId}
             notation={notation}
             onChangeNotation={setNotation}
             modules={modules}
             onChangeModules={setModules}
-            onBack={() => setActiveTrackId(null)}
-            onEditTrack={(track) => setEditorState({ open: true, track })}
+            onBack={() => setPage({ kind: 'library' })}
+            onEditTrack={(track) =>
+              setPage({ kind: 'editor', track, returnToTrackId: track.id })
+            }
           />
         ) : (
           <LibraryView
             tracks={tracks}
-            onOpenTrack={(id, vId) => {
-              setActiveTrackId(id);
-              setActiveVersionId(vId);
-            }}
-            onEditTrack={(track) => setEditorState({ open: true, track })}
+            onOpenTrack={(id, vId) => setPage({ kind: 'reader', trackId: id, versionId: vId })}
+            onEditTrack={(track) => setPage({ kind: 'editor', track })}
           />
         )}
       </main>
 
-      {/* Modals */}
+      {/* Utility Modals */}
       <LibraryJsonModal
         open={jsonModalOpen}
         onClose={() => setJsonModalOpen(false)}
         existingTracks={tracks}
       />
 
-      {editorState.open && (
-        <TrackEditorModal
-          open={editorState.open}
-          initialTrack={editorState.track}
-          onClose={() => setEditorState({ open: false, track: null })}
-          onSaved={(saved) => {
-            setActiveTrackId(saved.id);
-            setActiveVersionId(saved.versions[0]?.id);
-          }}
-        />
-      )}
-
       <ExternalImportModal
         open={importerOpen}
         onClose={() => setImporterOpen(false)}
-        onImported={(imported) => {
-          setActiveTrackId(imported.id);
-          setActiveVersionId(imported.versions[0]?.id);
-        }}
+        onImported={(imported) =>
+          setPage({ kind: 'reader', trackId: imported.id, versionId: imported.versions[0]?.id })
+        }
       />
 
       <TunerModal open={tunerOpen} onClose={() => setTunerOpen(false)} notation={notation} />

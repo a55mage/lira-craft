@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { Difficulty, Instrument, Track } from '../types/music';
 import { deleteTrack, restoreDemoTracks, saveTrack, toggleFavorite } from '../db/database';
-import { INSTRUMENT_NAME, InstrumentIcon, TrackCover } from './InstrumentIcon';
+import { INSTRUMENT_NAME, TrackCover } from './InstrumentIcon';
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -37,7 +37,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | 'all'>('all');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date_desc');
-  const [viewMode, setViewMode] = useState<ViewMode>('compact_cards');
+  const [viewMode, setViewMode] = useState<ViewMode>('minimal_cards');
 
   const filteredAndSorted = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,20 +91,23 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-5 space-y-4 animate-fade-up">
-      {/* Compact Toolbar: Search, Filters, Sort, View Mode */}
-      <div className="flex flex-col lg:flex-row gap-2.5">
+    <div className="max-w-7xl mx-auto px-4 py-3 space-y-3 animate-fade-up">
+      {/* Compact Flat Toolbar */}
+      <div
+        className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 pb-2.5 border-b"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
         <div className="relative flex-1">
           <Search
-            className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--text-secondary)' }}
+            className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}
           />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Cerca titolo, artista o tag..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border text-sm transition focus:outline-none"
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg border text-sm transition focus:outline-none"
             style={{
               backgroundColor: 'var(--bg-surface)',
               borderColor: 'var(--border-color)',
@@ -112,16 +115,13 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <select
             value={instrumentFilter}
             onChange={(e) => setInstrumentFilter(e.target.value as Instrument | 'all')}
             aria-label="Filtra per strumento"
-            className="px-2.5 py-2 rounded-xl border text-xs font-medium"
-            style={{
-              backgroundColor: 'var(--bg-surface)',
-              borderColor: 'var(--border-color)',
-            }}
+            className="px-2 py-1.5 rounded-lg bg-transparent font-medium cursor-pointer"
+            style={{ color: 'var(--text-secondary)' }}
           >
             <option value="all">Tutti gli strumenti</option>
             <option value="piano">Piano</option>
@@ -133,13 +133,10 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             value={difficultyFilter}
             onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | 'all')}
             aria-label="Filtra per difficoltà"
-            className="px-2.5 py-2 rounded-xl border text-xs font-medium"
-            style={{
-              backgroundColor: 'var(--bg-surface)',
-              borderColor: 'var(--border-color)',
-            }}
+            className="px-2 py-1.5 rounded-lg bg-transparent font-medium cursor-pointer"
+            style={{ color: 'var(--text-secondary)' }}
           >
-            <option value="all">Tutte le difficoltà</option>
+            <option value="all">Difficoltà: tutte</option>
             <option value="beginner">Principiante</option>
             <option value="intermediate">Intermedio</option>
             <option value="advanced">Avanzato</option>
@@ -147,54 +144,47 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
 
           <div className="relative inline-flex items-center">
             <ArrowUpDown
-              className="w-3.5 h-3.5 absolute left-2.5 pointer-events-none"
-              style={{ color: 'var(--text-secondary)' }}
+              className="w-3.5 h-3.5 absolute left-1.5 pointer-events-none"
+              style={{ color: 'var(--text-muted)' }}
             />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               aria-label="Ordina brani"
-              className="pl-8 pr-3 py-2 rounded-xl border text-xs font-medium"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-color)',
-              }}
+              className="pl-6 pr-2 py-1.5 rounded-lg bg-transparent font-medium cursor-pointer"
+              style={{ color: 'var(--text-secondary)' }}
             >
-              <option value="date_desc">Data aggiunta (Recenti)</option>
-              <option value="date_asc">Data aggiunta (Meno recenti)</option>
-              <option value="title_asc">Titolo (A–Z)</option>
-              <option value="artist_asc">Artista (A–Z)</option>
+              <option value="date_desc">Recenti</option>
+              <option value="date_asc">Meno recenti</option>
+              <option value="title_asc">Titolo A–Z</option>
+              <option value="artist_asc">Artista A–Z</option>
             </select>
           </div>
 
           <button
             type="button"
             onClick={() => setOnlyFavorites((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer transition"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg font-medium cursor-pointer transition"
             style={{
-              backgroundColor: onlyFavorites ? 'var(--accent-bg)' : 'var(--bg-surface)',
-              borderColor: onlyFavorites ? 'var(--accent)' : 'var(--border-color)',
-              color: onlyFavorites ? 'var(--accent)' : 'var(--text-primary)',
+              color: onlyFavorites ? 'var(--accent)' : 'var(--text-secondary)',
+              backgroundColor: onlyFavorites ? 'var(--accent-bg)' : 'transparent',
             }}
           >
             <Heart className={`w-3.5 h-3.5 ${onlyFavorites ? 'fill-current' : ''}`} />
             Preferiti
           </button>
 
-          {/* View Mode Toggle: Minimal Cards vs Compact Cards vs List */}
-          <div
-            className="inline-flex rounded-xl p-0.5 border"
-            style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-          >
+          {/* View Mode Icons */}
+          <div className="inline-flex items-center gap-0.5 pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
             <button
               type="button"
               onClick={() => setViewMode('minimal_cards')}
-              aria-label="Card essenziali (ultra-compatte)"
-              title="Card essenziali (senza info secondarie)"
-              className="p-1.5 rounded-lg transition cursor-pointer"
+              aria-label="Card essenziali"
+              title="Card essenziali"
+              className="p-1.5 rounded-lg cursor-pointer"
               style={{
-                backgroundColor: viewMode === 'minimal_cards' ? 'var(--bg-surface)' : 'transparent',
-                color: viewMode === 'minimal_cards' ? 'var(--accent)' : 'var(--text-secondary)',
+                color: viewMode === 'minimal_cards' ? 'var(--accent)' : 'var(--text-muted)',
+                backgroundColor: viewMode === 'minimal_cards' ? 'var(--accent-bg)' : 'transparent',
               }}
             >
               <Grid2x2 className="w-4 h-4" />
@@ -202,12 +192,12 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             <button
               type="button"
               onClick={() => setViewMode('compact_cards')}
-              aria-label="Visualizzazione card compatte"
+              aria-label="Card con dettagli"
               title="Card con dettagli"
-              className="p-1.5 rounded-lg transition cursor-pointer"
+              className="p-1.5 rounded-lg cursor-pointer"
               style={{
-                backgroundColor: viewMode === 'compact_cards' ? 'var(--bg-surface)' : 'transparent',
-                color: viewMode === 'compact_cards' ? 'var(--accent)' : 'var(--text-secondary)',
+                color: viewMode === 'compact_cards' ? 'var(--accent)' : 'var(--text-muted)',
+                backgroundColor: viewMode === 'compact_cards' ? 'var(--accent-bg)' : 'transparent',
               }}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -215,12 +205,12 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              aria-label="Visualizzazione lista"
+              aria-label="Lista"
               title="Lista"
-              className="p-1.5 rounded-lg transition cursor-pointer"
+              className="p-1.5 rounded-lg cursor-pointer"
               style={{
-                backgroundColor: viewMode === 'list' ? 'var(--bg-surface)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--accent)' : 'var(--text-secondary)',
+                color: viewMode === 'list' ? 'var(--accent)' : 'var(--text-muted)',
+                backgroundColor: viewMode === 'list' ? 'var(--accent-bg)' : 'transparent',
               }}
             >
               <List className="w-4 h-4" />
@@ -229,48 +219,39 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
         </div>
       </div>
 
-      {/* Results count when filtering */}
       {(query || instrumentFilter !== 'all' || difficultyFilter !== 'all' || onlyFavorites) && (
-        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Mostrati <strong>{filteredAndSorted.length}</strong> di {tracks.length} brani
         </div>
       )}
 
       {/* Empty state */}
       {filteredAndSorted.length === 0 ? (
-        <div
-          className="rounded-2xl border p-10 text-center space-y-3 music-paper"
-          style={{ borderColor: 'var(--border-color)' }}
-        >
-          <Music className="w-10 h-10 mx-auto opacity-40" />
+        <div className="py-12 text-center space-y-3">
+          <Music className="w-9 h-9 mx-auto opacity-35" />
           <div className="font-display font-semibold text-base">Nessun brano trovato</div>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Modifica i filtri, aggiungi un nuovo brano dalla barra in alto oppure ripristina i brani demo.
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Modifica i filtri o ripristina i brani demo.
           </p>
-          <div className="flex justify-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={restoreDemoTracks}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer"
-              style={{
-                backgroundColor: 'var(--bg-surface-2)',
-                borderColor: 'var(--border-color)',
-              }}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Ripristina Brani Demo
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={restoreDemoTracks}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+            style={{ backgroundColor: 'var(--bg-surface-2)' }}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Ripristina Brani Demo
+          </button>
         </div>
       ) : viewMode === 'minimal_cards' ? (
-        /* ULTRA-COMPACT MINIMAL CARDS (Album art + Title + Artist + Favorite only) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+        /* ULTRA-COMPACT MINIMAL CARDS */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {filteredAndSorted.map((track) => {
             const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
             return (
               <div
                 key={track.id}
-                className="rounded-xl border p-2.5 flex items-center gap-2.5 music-paper transition-colors hover:border-[var(--accent)]"
+                className="rounded-xl border p-2 flex items-center gap-2.5 music-paper transition-colors hover:border-[var(--accent)]"
                 style={{ borderColor: 'var(--border-color)' }}
               >
                 <button
@@ -307,28 +288,24 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
           })}
         </div>
       ) : viewMode === 'list' ? (
-        /* LIST VIEW */
-        <div
-          className="rounded-2xl border divide-y overflow-hidden music-paper"
-          style={{ borderColor: 'var(--border-color)' }}
-        >
+        /* CLEAN FLAT LIST VIEW (No nested pills) */
+        <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
           {filteredAndSorted.map((track) => {
             const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
-            const instruments = Array.from(new Set(track.versions.map((v) => v.instrument)));
+            const instruments = Array.from(new Set(track.versions.map((v) => INSTRUMENT_NAME[v.instrument]))).join(', ');
             return (
               <div
                 key={track.id}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 transition hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                className="flex items-center justify-between gap-3 py-2 px-1 transition hover:bg-black/[0.025] dark:hover:bg-white/[0.025]"
                 style={{ borderColor: 'var(--border-color)' }}
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <TrackCover
                     coverArt={track.coverArt}
                     title={track.title}
                     instrument={primaryInst}
                     size="sm"
                   />
-
                   <button
                     type="button"
                     onClick={() => onOpenTrack(track.id)}
@@ -339,7 +316,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                         {track.title}
                       </span>
                       <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>
-                        — {track.artist}
+                        {track.artist}
                       </span>
                     </div>
                     <div className="text-[11px] sm:hidden truncate" style={{ color: 'var(--text-secondary)' }}>
@@ -348,54 +325,28 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                   </button>
                 </div>
 
-                {/* Metadata */}
-                <div className="hidden md:flex items-center gap-1.5 shrink-0 text-[11px]">
-                  {instruments.map((inst) => (
-                    <span
-                      key={inst}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium"
-                      style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
-                    >
-                      <InstrumentIcon instrument={inst} className="w-3 h-3" />
-                      {INSTRUMENT_NAME[inst]}
-                    </span>
-                  ))}
-                  <span
-                    className="px-2 py-0.5 rounded-md font-mono font-medium"
-                    style={{ backgroundColor: 'var(--bg-surface-2)' }}
-                  >
-                    {track.originalKey} · {track.defaultBpm}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-md" style={{ color: 'var(--text-muted)' }}>
-                    {track.versions.length} ver.
-                  </span>
+                <div className="hidden md:flex items-center gap-3 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <span>{instruments}</span>
+                  <span className="font-mono">{track.originalKey} · {track.defaultBpm}</span>
+                  <span>{track.versions.length} ver.</span>
                 </div>
 
-                {/* Row Actions */}
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => void toggleFavorite(track.id)}
-                    aria-label={track.isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-                    className="p-1.5 rounded cursor-pointer"
+                    aria-label="Preferito"
+                    className="p-1.5 cursor-pointer"
                     style={{ color: track.isFavorite ? '#a98467' : 'var(--text-muted)' }}
                   >
                     <Heart className={`w-3.5 h-3.5 ${track.isFavorite ? 'fill-current' : ''}`} />
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenTrack(track.id)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90"
-                    style={{ backgroundColor: 'var(--accent)' }}
-                  >
-                    Apri
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => onEditTrack(track)}
                     title="Modifica"
                     aria-label="Modifica brano"
-                    className="p-1.5 rounded-lg cursor-pointer hover:opacity-75"
+                    className="p-1.5 cursor-pointer hover:opacity-75"
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -405,7 +356,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                     onClick={() => void handleDuplicate(track)}
                     title="Duplica"
                     aria-label="Duplica brano"
-                    className="p-1.5 rounded-lg cursor-pointer hover:opacity-75 hidden sm:inline-flex"
+                    className="p-1.5 cursor-pointer hover:opacity-75 hidden sm:inline-flex"
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -415,7 +366,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                     onClick={() => void handleDelete(track)}
                     title="Elimina"
                     aria-label="Elimina brano"
-                    className="p-1.5 rounded-lg cursor-pointer hover:text-red-500"
+                    className="p-1.5 cursor-pointer hover:text-red-500"
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -426,18 +377,18 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
           })}
         </div>
       ) : (
-        /* COMPACT CARDS VIEW */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        /* COMPACT CARDS WITH DETAILS (Clean text hierarchy, zero nested pills) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
           {filteredAndSorted.map((track) => {
             const primaryInst = track.versions[0]?.instrument ?? 'ukulele';
-            const instruments = Array.from(new Set(track.versions.map((v) => v.instrument)));
+            const instruments = Array.from(new Set(track.versions.map((v) => INSTRUMENT_NAME[v.instrument]))).join(' · ');
             return (
               <div
                 key={track.id}
-                className="rounded-xl border p-3.5 flex flex-col justify-between gap-2.5 transition-colors duration-150 music-paper"
+                className="rounded-xl border p-3 flex flex-col justify-between gap-2 transition-colors music-paper"
                 style={{ borderColor: 'var(--border-color)' }}
               >
-                <div className="space-y-2.5">
+                <div className="space-y-1.5">
                   <div className="flex items-start gap-2.5">
                     <TrackCover
                       coverArt={track.coverArt}
@@ -453,99 +404,89 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
                       <h2 className="font-display font-semibold text-sm leading-snug group-hover:underline truncate">
                         {track.title}
                       </h2>
-                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
                         {track.artist}
                       </p>
                     </button>
                     <button
                       type="button"
                       onClick={() => void toggleFavorite(track.id)}
-                      aria-label={track.isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-                      className="p-1 rounded cursor-pointer shrink-0"
+                      aria-label="Preferito"
+                      className="p-0.5 cursor-pointer shrink-0"
                       style={{ color: track.isFavorite ? '#a98467' : 'var(--text-muted)' }}
                     >
                       <Heart className={`w-3.5 h-3.5 ${track.isFavorite ? 'fill-current' : ''}`} />
                     </button>
                   </div>
 
-                  {/* Compact Meta Pills */}
-                  <div className="flex flex-wrap gap-1 text-[10px]">
-                    <span
-                      className="px-1.5 py-0.5 rounded font-mono font-medium"
-                      style={{ backgroundColor: 'var(--bg-surface-2)' }}
-                    >
-                      {track.originalKey} · {track.defaultBpm} BPM
-                    </span>
-                    {instruments.map((inst) => (
-                      <span
-                        key={inst}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium"
-                        style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent)' }}
-                      >
-                        <InstrumentIcon instrument={inst} className="w-2.5 h-2.5" />
-                        {INSTRUMENT_NAME[inst]}
-                      </span>
-                    ))}
+                  {/* Clean plain-text metadata */}
+                  <div className="text-[11px] flex items-center gap-1.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                    <span className="font-mono">{track.originalKey}</span>
+                    <span>·</span>
+                    <span className="font-mono">{track.defaultBpm} BPM</span>
+                    <span>·</span>
+                    <span className="truncate">{instruments}</span>
                   </div>
 
-                  {/* Compact Version Pills */}
-                  <div className="flex flex-wrap gap-1">
-                    {track.versions.slice(0, 3).map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => onOpenTrack(track.id, v.id)}
-                        className="max-w-full truncate px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer hover:opacity-80"
-                        style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
-                        title={`${v.name} (${DIFFICULTY_LABEL[v.difficulty]})`}
-                      >
-                        {v.name}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Clean inline version links */}
+                  {track.versions.length > 1 && (
+                    <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px]">
+                      {track.versions.slice(0, 3).map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => onOpenTrack(track.id, v.id)}
+                          className="truncate max-w-full cursor-pointer hover:underline"
+                          style={{ color: 'var(--accent)' }}
+                          title={`${v.name} (${DIFFICULTY_LABEL[v.difficulty]})`}
+                        >
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* Compact Footer */}
                 <div
-                  className="flex items-center justify-between pt-2 border-t"
+                  className="flex items-center justify-between pt-1.5 border-t text-xs"
                   style={{ borderColor: 'var(--border-color)' }}
                 >
                   <button
                     type="button"
                     onClick={() => onOpenTrack(track.id)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90"
-                    style={{ backgroundColor: 'var(--accent)' }}
+                    className="font-semibold cursor-pointer hover:underline"
+                    style={{ color: 'var(--accent)' }}
                   >
-                    Apri
+                    Apri spartito
                   </button>
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => onEditTrack(track)}
-                      title="Modifica brano e versioni"
+                      title="Modifica"
                       aria-label="Modifica brano"
-                      className="p-1 rounded-lg cursor-pointer hover:opacity-75"
-                      style={{ color: 'var(--text-secondary)' }}
+                      className="p-1 cursor-pointer hover:opacity-75"
+                      style={{ color: 'var(--text-muted)' }}
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleDuplicate(track)}
-                      title="Duplica brano"
+                      title="Duplica"
                       aria-label="Duplica brano"
-                      className="p-1 rounded-lg cursor-pointer hover:opacity-75"
-                      style={{ color: 'var(--text-secondary)' }}
+                      className="p-1 cursor-pointer hover:opacity-75"
+                      style={{ color: 'var(--text-muted)' }}
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleDelete(track)}
-                      title="Elimina brano"
+                      title="Elimina"
                       aria-label="Elimina brano"
-                      className="p-1 rounded-lg cursor-pointer hover:text-red-500"
-                      style={{ color: 'var(--text-secondary)' }}
+                      className="p-1 cursor-pointer hover:text-red-500"
+                      style={{ color: 'var(--text-muted)' }}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
