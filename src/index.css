@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * Shape scale: 3 radii only.
+ *   md  = small inline chips/tags
+ *   lg/xl = every control (buttons, inputs, cards in lists)
+ *   2xl = panels / large surfaces
+ */
+@theme {
+  --radius-md: 0.375rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 1rem;
+}
+
 :root {
   color-scheme: light dark;
   /* Botanical & Acoustic Wood Palette: #f0ead2, #dde5b6, #adc178, #a98467, #6c584c */
@@ -15,7 +28,8 @@
   --bg-surface-3: light-dark(#dde5b6, #433930);
   --text-primary: light-dark(#3b3029, #f0ead2);
   --text-secondary: light-dark(#6c584c, #dde5b6);
-  --text-muted: light-dark(#8b7360, #a98467);
+  /* Tuned for >= 4.5:1 contrast on --bg-surface in both themes */
+  --text-muted: light-dark(#76604f, #b8977b);
   --border-color: light-dark(#d8cfaf, #4a3f36);
   --accent: light-dark(#6c584c, #adc178);
   --accent-warm: light-dark(#a98467, #dde5b6);
@@ -23,6 +37,10 @@
   --accent-hover: light-dark(#56453b, #c2d48f);
   --sheet-bg: light-dark(#fffdf7, #faf7ec);
   --sheet-ink: #3b3029;
+  --sheet-bg-dark: #221c18;
+  --sheet-ink-dark: #efe7cf;
+  --chord-color: light-dark(#55652a, #c2d48f);
+  --focus-ring: light-dark(#6c584c, #c2d48f);
   --shadow-warm: light-dark(0 4px 18px -4px rgba(108, 88, 76, 0.12), 0 8px 24px -6px rgba(0, 0, 0, 0.45));
 
   &:has(> head > meta[name="color-scheme"][content="dark"]) {
@@ -71,6 +89,16 @@ body {
   box-shadow: var(--shadow-warm);
 }
 
+/* Keyboard focus: always visible, never on mouse click */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-lg);
+}
+input[type='range']:focus-visible {
+  outline-offset: 4px;
+}
+
 /* Micro-animations */
 @keyframes fadeSlideUp {
   from {
@@ -85,6 +113,56 @@ body {
 
 .animate-fade-up {
   animation: fadeSlideUp 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Opacity only: a transform here would break the reader's position:fixed transport bar */
+@keyframes viewEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Page-level transition when switching library / reader / editor */
+.view-enter {
+  animation: viewEnter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes beatPulse {
+  0% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+}
+
+.beat-pulse {
+  animation: beatPulse 180ms ease-out;
+}
+
+@keyframes countInPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+.count-in-pulse {
+  animation: countInPulse 0.6s ease-out infinite;
+}
+
+/* Cover images: tinted placeholder + fade-in once decoded */
+.cover-img {
+  background-color: var(--bg-surface-3);
+  transition: opacity 200ms ease;
 }
 
 .key-glow {
@@ -123,6 +201,28 @@ dialog[open] {
   stroke-width: 2.5px;
 }
 
+/* Dark sheet-music surface (abcjs draws with currentColor) */
+.sheet-dark {
+  background-color: var(--sheet-bg-dark) !important;
+  color: var(--sheet-ink-dark) !important;
+}
+.sheet-dark .abcjs-highlight {
+  fill: #c2d48f !important;
+  stroke: #c2d48f !important;
+}
+
+/* Respect the OS "reduce motion" setting */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Print-friendly PDF export */
 @media print {
   .no-print {
@@ -138,5 +238,6 @@ dialog[open] {
     border: none !important;
     padding: 0 !important;
     background: #ffffff !important;
+    color: #000000 !important;
   }
 }

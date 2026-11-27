@@ -91,7 +91,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-3 space-y-3 animate-fade-up">
+    <div className="max-w-7xl mx-auto px-4 py-3 space-y-3">
       {/* Compact Flat Toolbar */}
       <div
         className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 pb-2.5 border-b"

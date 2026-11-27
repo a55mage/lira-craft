@@ -1,4 +1,4 @@
-import { formatChord, normalizeChordToAlpha, transposeChord } from './musicTheory';
+import { CHORD_SYMBOL_RE, formatChord, normalizeChordToAlpha, transposeChord } from './musicTheory';
 import type { NotationSystem } from '../types/music';
 
 export interface ChordToken {
@@ -14,8 +14,7 @@ export interface ParsedLine {
   tokens: ChordToken[];
 }
 
-const VALID_CHORD_RE =
-  /^(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?(?:m|min|maj|dim|aug|sus[24]?|add\d+|7|9|11|13|6|5|maj7|m7|m9|m6|7sus4|dim7)?(?:\/(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?)?$/i;
+const VALID_CHORD_RE = CHORD_SYMBOL_RE;
 
 const SECTION_KEYWORDS =
   'Intro|Verse|Strofa|Pre-Chorus|Pre-Ritornello|Chorus|Ritornello|Refrain|Bridge|Ponte|Outro|Solo|Interlude|Interludio|Instrumental|Strumentale|Coda|Hook|Tema|Ending|Finale';
@@ -60,7 +59,8 @@ function isChordLinePlain(line: string): boolean {
 export function parseChordPro(
   input: string,
   transposeSemitones = 0,
-  notation: NotationSystem = 'alpha'
+  notation: NotationSystem = 'alpha',
+  preferFlats?: boolean
 ): ParsedLine[] {
   if (!input.trim()) return [];
 
@@ -104,7 +104,7 @@ export function parseChordPro(
       result.push({ type: 'section', sectionTitle: secTitle, tokens: [] });
       const remainder = bracketSec[2]?.trim();
       if (remainder) {
-        result.push(parseLyricLine(remainder, transposeSemitones, notation));
+        result.push(parseLyricLine(remainder, transposeSemitones, notation, preferFlats));
       }
       continue;
     }
@@ -120,9 +120,9 @@ export function parseChordPro(
             .split(/\s+/)
             .map((p) => (VALID_CHORD_RE.test(p) ? `[${p}]` : p))
             .join('  ');
-          result.push(parseLyricLine(bracketed, transposeSemitones, notation));
+          result.push(parseLyricLine(bracketed, transposeSemitones, notation, preferFlats));
         } else {
-          result.push(parseLyricLine(remainder, transposeSemitones, notation));
+          result.push(parseLyricLine(remainder, transposeSemitones, notation, preferFlats));
         }
       }
       continue;
@@ -148,7 +148,7 @@ export function parseChordPro(
         !BRACKET_SECTION_RE.test(nextRaw.trim())
       ) {
         const merged = mergeChordsAboveLyric(line, nextRaw);
-        result.push(parseLyricLine(merged, transposeSemitones, notation));
+        result.push(parseLyricLine(merged, transposeSemitones, notation, preferFlats));
         i++;
         continue;
       } else {
@@ -156,12 +156,12 @@ export function parseChordPro(
           .split(/\s+/)
           .map((p) => (VALID_CHORD_RE.test(p) ? `[${p}]` : p))
           .join('  ');
-        result.push(parseLyricLine(bracketed, transposeSemitones, notation));
+        result.push(parseLyricLine(bracketed, transposeSemitones, notation, preferFlats));
         continue;
       }
     }
 
-    result.push(parseLyricLine(line, transposeSemitones, notation));
+    result.push(parseLyricLine(line, transposeSemitones, notation, preferFlats));
   }
 
   return result;
@@ -196,7 +196,8 @@ export function mergeChordsAboveLyric(chordLine: string, lyricLine: string): str
 function parseLyricLine(
   line: string,
   transposeSemitones: number,
-  notation: NotationSystem
+  notation: NotationSystem,
+  preferFlats?: boolean
 ): ParsedLine {
   const tokens: ChordToken[] = [];
   const regex = /\[([^\]]+)\]([^\[]*)/g;
@@ -211,7 +212,7 @@ function parseLyricLine(
     const trailingText = match[2];
 
     if (VALID_CHORD_RE.test(bracketContent)) {
-      const raw = transposeChord(normalizeChordToAlpha(bracketContent), transposeSemitones);
+      const raw = transposeChord(normalizeChordToAlpha(bracketContent), transposeSemitones, preferFlats);
       tokens.push({
         rawChord: raw,
         chord: formatChord(raw, notation),
@@ -231,14 +232,19 @@ function parseLyricLine(
   return { type: 'lyric', tokens };
 }
 
-export function extractUniqueChords(lyricsChords: string, abcNotation: string, transposeSemitones = 0): string[] {
+export function extractUniqueChords(
+  lyricsChords: string,
+  abcNotation: string,
+  transposeSemitones = 0,
+  preferFlats?: boolean
+): string[] {
   const found: string[] = [];
   const seen = new Set<string>();
 
   const add = (raw: string) => {
     const cleaned = raw.trim();
     if (!VALID_CHORD_RE.test(cleaned)) return;
-    const normalized = transposeChord(normalizeChordToAlpha(cleaned), transposeSemitones);
+    const normalized = transposeChord(normalizeChordToAlpha(cleaned), transposeSemitones, preferFlats);
     if (!normalized || seen.has(normalized)) return;
     seen.add(normalized);
     found.push(normalized);

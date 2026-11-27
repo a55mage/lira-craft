@@ -1,17 +1,40 @@
 import type { Instrument } from '../types/music';
-import { getChordMidiNotes, midiToFrequency, normalizeChordToAlpha, transposeChord } from './musicTheory';
+import { getChordMidiNotes, midiToFrequency } from './musicTheory';
 
-export interface TimelineEvent {
-  id: number;
-  startBeat: number;
-  durationBeats: number;
-  midiNotes: number[];
-  chord?: string; // Alpha transposed chord
-  label?: string;
-}
+export type { TimelineEvent, MeterInfo } from './abcTimeline';
+export { parseAbcToTimeline, buildTimelineFromChordPro, getAbcMeter, parseMeter } from './abcTimeline';
 
 class WebAudioEngine {
   private ctx: AudioContext | null = null;
+  private master: AudioNode | null = null;
+
+  /** Shared output bus with a gentle compressor so stacked notes + chords never clip. */
+  getMaster(): AudioNode {
+    const ctx = this.getContext();
+    if (!this.master) {
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.setValueAtTime(-14, ctx.currentTime);
+      comp.knee.setValueAtTime(12, ctx.currentTime);
+      comp.ratio.setValueAtTime(4, ctx.currentTime);
+      comp.attack.setValueAtTime(0.003, ctx.currentTime);
+      comp.release.setValueAtTime(0.2, ctx.currentTime);
+      comp.connect(ctx.destination);
+      this.master = comp;
+    }
+    return this.master;
+  }
+
+  /**
+   * Creates a disposable gain bus for one playback session: disconnecting it silences every
+   * note already scheduled ahead of time (used on pause/stop/seek).
+   */
+  createBus(): GainNode {
+    const ctx = this.getContext();
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(1, ctx.currentTime);
+    bus.connect(this.getMaster());
+    return bus;
+  }
 
   getContext(): AudioContext {
     if (!this.ctx) {
@@ -24,14 +47,21 @@ class WebAudioEngine {
     return this.ctx;
   }
 
-  playNote(midi: number, durationSec: number, instrument: Instrument, startTime?: number, gainScale = 0.25): void {
+  playNote(
+    midi: number,
+    durationSec: number,
+    instrument: Instrument,
+    startTime?: number,
+    gainScale = 0.25,
+    destination?: AudioNode
+  ): void {
     const ctx = this.getContext();
-    const now = startTime ?? ctx.currentTime;
+    const now = Math.max(ctx.currentTime, startTime ?? ctx.currentTime);
     const freq = midiToFrequency(midi);
     const dur = Math.max(0.08, durationSec);
 
     const masterGain = ctx.createGain();
-    masterGain.connect(ctx.destination);
+    masterGain.connect(destination ?? this.getMaster());
 
     if (instrument === 'piano') {
       // Warm multi-harmonic piano tone
@@ -101,21 +131,28 @@ class WebAudioEngine {
     }
   }
 
-  playChord(chordSymbol: string, instrument: Instrument, durationSec = 0.9, gainScale = 0.14): void {
+  playChord(
+    chordSymbol: string,
+    instrument: Instrument,
+    durationSec = 0.9,
+    gainScale = 0.14,
+    startTime?: number,
+    destination?: AudioNode
+  ): void {
     const ctx = this.getContext();
-    const now = ctx.currentTime;
+    const now = Math.max(ctx.currentTime, startTime ?? ctx.currentTime);
     const baseOctave = instrument === 'ukulele' ? 4 : 3;
     const midis = getChordMidiNotes(chordSymbol, baseOctave);
     const strumDelay = instrument === 'piano' ? 0.015 : 0.028;
 
     midis.forEach((m, idx) => {
-      this.playNote(m, durationSec, instrument, now + idx * strumDelay, gainScale);
+      this.playNote(m, durationSec, instrument, now + idx * strumDelay, gainScale, destination);
     });
   }
 
-  playMetronomeClick(isAccent = false): void {
+  playMetronomeClick(isAccent = false, startTime?: number, destination?: AudioNode): void {
     const ctx = this.getContext();
-    const now = ctx.currentTime;
+    const now = Math.max(ctx.currentTime, startTime ?? ctx.currentTime);
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -124,7 +161,7 @@ class WebAudioEngine {
     gain.gain.linearRampToValueAtTime(isAccent ? 0.25 : 0.15, now + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(destination ?? this.getMaster());
     osc.start(now);
     osc.stop(now + 0.06);
   }
@@ -147,106 +184,3 @@ class WebAudioEngine {
 }
 
 export const audioEngine = new WebAudioEngine();
-
-/**
- * Parses ABC notation into a beat-aligned sequence of TimelineEvents for both
- * Web Audio playback and the Simply Piano interactive visualizers.
- */
-const ABC_BASE_MIDI: Record<string, number> = {
-  C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71,
-  c: 72, d: 74, e: 76, f: 77, g: 79, a: 81, b: 83,
-};
-
-export function parseAbcToTimeline(abc: string, transposeSemitones = 0): TimelineEvent[] {
-  if (!abc.trim()) return [];
-
-  const bodyLines = abc
-    .split('\n')
-    .filter((line) => !/^[A-Za-z]:/.test(line.trim()) && !line.trim().startsWith('%'));
-  const body = bodyLines.join(' ');
-
-  const events: TimelineEvent[] = [];
-  let currentBeat = 0;
-  let pendingChord: string | undefined;
-  let idCounter = 0;
-
-  // Match quoted chords OR notes/rests with optional accidentals, octave marks, and duration
-  const tokenRe = /"([^"]+)"|(\^{1,2}|_{1,2}|=)?([A-Ga-gz])([,']*)(\d*\/?\d*)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = tokenRe.exec(body)) !== null) {
-    if (match[1]) {
-      pendingChord = transposeChord(normalizeChordToAlpha(match[1]), transposeSemitones);
-      continue;
-    }
-
-    const [, , accidental, letter, octaveMarks, durStr] = match;
-    let duration = 1;
-    if (durStr) {
-      if (durStr.includes('/')) {
-        const [numStr, denStr] = durStr.split('/');
-        const num = numStr ? Number(numStr) : 1;
-        const den = denStr ? Number(denStr) : 2;
-        if (den > 0) duration = num / den;
-      } else {
-        duration = Number(durStr) || 1;
-      }
-    }
-
-    if (letter === 'z') {
-      currentBeat += duration;
-      continue;
-    }
-
-    let midi = ABC_BASE_MIDI[letter] ?? 60;
-    if (accidental === '^') midi += 1;
-    else if (accidental === '^^') midi += 2;
-    else if (accidental === '_') midi -= 1;
-    else if (accidental === '__') midi -= 2;
-
-    for (const ch of octaveMarks || '') {
-      if (ch === ',') midi -= 12;
-      else if (ch === "'") midi += 12;
-    }
-
-    midi += transposeSemitones;
-
-    events.push({
-      id: idCounter++,
-      startBeat: currentBeat,
-      durationBeats: duration,
-      midiNotes: [midi],
-      chord: pendingChord,
-    });
-
-    pendingChord = undefined;
-    currentBeat += duration;
-  }
-
-  return events;
-}
-
-/**
- * Fallback timeline builder from ChordPro when no ABC notation is present.
- */
-export function buildTimelineFromChordPro(lyricsChords: string, transposeSemitones = 0): TimelineEvent[] {
-  const events: TimelineEvent[] = [];
-  let beat = 0;
-  let id = 0;
-
-  for (const m of lyricsChords.matchAll(/\[([^\]]+)\]/g)) {
-    const raw = normalizeChordToAlpha(m[1]);
-    if (!/^[A-G][#b]?/.test(raw)) continue;
-    const chord = transposeChord(raw, transposeSemitones);
-    events.push({
-      id: id++,
-      startBeat: beat,
-      durationBeats: 4,
-      midiNotes: getChordMidiNotes(chord, 4),
-      chord,
-    });
-    beat += 4;
-  }
-
-  return events;
-}

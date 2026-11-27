@@ -1,10 +1,9 @@
 import { Midi } from '@tonejs/midi';
 import JSZip from 'jszip';
-import { normalizeChordToAlpha } from './musicTheory';
+import { CHORD_SYMBOL_RE, normalizeChordToAlpha } from './musicTheory';
 import { mergeChordsAboveLyric, sanitizeChordProLine } from './chordPro';
 
-const CHORD_TOKEN_RE =
-  /^(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?(?:m|min|maj|dim|aug|sus[24]?|add\d+|7|9|11|13|6|5|maj7|m7|m9)?(?:\/(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si)[#b♯♭]?)?$/i;
+const CHORD_TOKEN_RE = CHORD_SYMBOL_RE;
 
 function isChordLine(line: string): boolean {
   const trimmed = line.trim();

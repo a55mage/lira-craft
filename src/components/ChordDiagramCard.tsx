@@ -48,17 +48,17 @@ export function ChordDiagramCard({
         style={{
           backgroundColor: isActive ? 'var(--accent-bg)' : 'var(--bg-surface)',
           borderColor: isActive ? 'var(--accent)' : 'var(--border-color)',
-          minWidth: compact ? '106px' : '136px',
+          minWidth: compact ? '128px' : '150px',
         }}
         title={`Ascolta accordo ${displayLabel}`}
       >
         <div className="flex items-center justify-between w-full">
-          <span className="font-bold text-sm" style={{ color: 'var(--accent)' }}>
+          <span className="font-bold text-base leading-none" style={{ color: 'var(--chord-color)' }}>
             {displayLabel}
           </span>
           <Volume2 className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
         </div>
-        <svg viewBox="0 0 140 54" className="w-full h-12">
+        <svg viewBox="0 0 140 54" className="w-full h-16">
           {whiteKeys.map((pc, i) => {
             const lit = activePitchClasses.has(pc);
             return (
@@ -115,19 +115,19 @@ export function ChordDiagramCard({
       style={{
         backgroundColor: isActive ? 'var(--accent-bg)' : 'var(--bg-surface)',
         borderColor: isActive ? 'var(--accent)' : 'var(--border-color)',
-        minWidth: compact ? '96px' : '124px',
+        minWidth: compact ? '112px' : '132px',
       }}
       title={diagram?.easyNote ? `${displayLabel} — ${diagram.easyNote}` : `Ascolta ${displayLabel}`}
     >
       <div className="flex items-center justify-between w-full">
-        <span className="font-bold text-sm" style={{ color: 'var(--accent)' }}>
+        <span className="font-bold text-base leading-none" style={{ color: 'var(--chord-color)' }}>
           {displayLabel}
         </span>
         <Volume2 className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
       </div>
 
       {diagram ? (
-        <svg viewBox={`0 0 ${width} 86`} className="w-24 h-20">
+        <svg viewBox={`0 0 ${width} 86`} className="w-28 h-24">
           {/* Base fret indicator */}
           {baseFret > 1 && (
             <text x={2} y={yStart + 11} fontSize="8" fill="currentColor" opacity="0.7">

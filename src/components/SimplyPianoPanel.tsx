@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Mic, Piano, Radio } from 'lucide-react';
 import type { Instrument, NotationSystem } from '../types/music';
 import type { TimelineEvent } from '../lib/audioEngine';
@@ -25,11 +25,39 @@ interface SimplyPianoPanelProps {
   waitModeStatus: string | null;
   onUserNotePlayed: (midi: number) => void;
   onSeekBeat: (beat: number) => void;
+  beatsPerBar?: number;
 }
 
-const PIANO_START_MIDI = 57; // A3
-const PIANO_END_MIDI = 84;   // C6
 const BLACK_KEY_PCS = new Set([1, 3, 6, 8, 10]);
+const MIN_SPAN = 17; // at least an octave and a half of keys
+const CHORD_LANE_PX = 22;
+
+/** Keyboard range fitted to the song's notes (white-key aligned, at least 1.5 octaves). */
+function computeKeyRange(events: TimelineEvent[]): { start: number; end: number } {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const ev of events) {
+    for (const m of ev.midiNotes) {
+      if (m < lo) lo = m;
+      if (m > hi) hi = m;
+    }
+  }
+  if (!Number.isFinite(lo)) {
+    lo = 57;
+    hi = 84;
+  }
+  lo -= 2;
+  hi += 2;
+  while (hi - lo < MIN_SPAN) {
+    lo -= 1;
+    if (hi - lo < MIN_SPAN) hi += 1;
+  }
+  lo = Math.max(21, lo);
+  hi = Math.min(108, hi);
+  while (BLACK_KEY_PCS.has(((lo % 12) + 12) % 12)) lo--;
+  while (BLACK_KEY_PCS.has(((hi % 12) + 12) % 12)) hi++;
+  return { start: lo, end: hi };
+}
 
 export function SimplyPianoPanel({
   events,
@@ -47,6 +75,7 @@ export function SimplyPianoPanel({
   waitModeStatus,
   onUserNotePlayed,
   onSeekBeat,
+  beatsPerBar = 4,
 }: SimplyPianoPanelProps) {
   const activeMidis = useMemo(() => new Set(activeEvent?.midiNotes ?? []), [activeEvent]);
 
@@ -67,17 +96,42 @@ export function SimplyPianoPanel({
   const WINDOW_BEATS = 8;
   const visibleEvents = useMemo(() => {
     return events.filter(
-      (ev) => ev.startBeat + ev.durationBeats >= currentBeat - 0.5 && ev.startBeat <= currentBeat + WINDOW_BEATS
+      (ev) =>
+        ev.midiNotes.length > 0 &&
+        ev.startBeat + ev.durationBeats >= currentBeat - 0.5 &&
+        ev.startBeat <= currentBeat + WINDOW_BEATS
     );
   }, [events, currentBeat]);
 
+  const keyRange = useMemo(() => computeKeyRange(events), [events]);
+  const PIANO_END_MIDI = keyRange.end;
   const whiteKeys = useMemo(() => {
     const list: number[] = [];
-    for (let m = PIANO_START_MIDI; m <= PIANO_END_MIDI; m++) {
+    for (let m = keyRange.start; m <= keyRange.end; m++) {
       if (!BLACK_KEY_PCS.has(m % 12)) list.push(m);
     }
     return list;
-  }, []);
+  }, [keyRange]);
+
+  // Bar and beat grid lines visible in the note highway window
+  const gridLines = useMemo(() => {
+    const lines: { beat: number; isBar: boolean; bar: number }[] = [];
+    const from = Math.floor(currentBeat - 2);
+    for (let b = Math.max(0, from); b <= currentBeat + WINDOW_BEATS; b += 1) {
+      const barPos = b / beatsPerBar;
+      const isBar = Math.abs(barPos - Math.round(barPos)) < 1e-6;
+      lines.push({ beat: b, isBar, bar: Math.round(barPos) + 1 });
+    }
+    return lines;
+  }, [currentBeat, beatsPerBar]);
+
+  const chordMarkers = useMemo(
+    () =>
+      events.filter(
+        (ev) => ev.chord && ev.startBeat <= currentBeat + WINDOW_BEATS && ev.startBeat >= currentBeat - WINDOW_BEATS
+      ),
+    [events, currentBeat]
+  );
 
   const frettedDiagram = useMemo(() => {
     if (instrument === 'piano' || !activeChord) return null;
@@ -89,10 +143,6 @@ export function SimplyPianoPanel({
 
   // Keep MIDI availability hint clean
   const midiSupported = typeof navigator !== 'undefined' && 'requestMIDIAccess' in navigator;
-
-  useEffect(() => {
-    // no-op placeholder to keep hook order stable
-  }, []);
 
   return (
     <div
@@ -175,7 +225,7 @@ export function SimplyPianoPanel({
             </span>
           )}
           <span style={{ color: 'var(--text-secondary)' }}>
-            Battuta {Math.floor(currentBeat / 4) + 1} / {Math.max(1, Math.ceil(totalBeats / 4))}
+            Battuta {Math.floor(currentBeat / beatsPerBar + 1e-6) + 1} / {Math.max(1, Math.ceil(totalBeats / beatsPerBar - 1e-6))}
           </span>
         </div>
       </div>
@@ -221,13 +271,28 @@ export function SimplyPianoPanel({
           className="px-4 py-2.5 border-b text-center space-y-1"
           style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
         >
+          {currentLine.tokens.every((t) => !t.text.trim()) ? (
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {currentLine.tokens
+                .filter((t) => t.chord)
+                .map((tok, i) => (
+                  <span
+                    key={i}
+                    className="min-w-[3rem] px-2.5 py-1 rounded-lg border text-sm font-bold"
+                    style={{ borderColor: 'var(--border-color)', color: 'var(--chord-color)', backgroundColor: 'var(--bg-surface-2)' }}
+                  >
+                    {tok.chord}
+                  </span>
+                ))}
+            </div>
+          ) : (
           <div className="flex flex-wrap items-end justify-center gap-x-1 gap-y-1 text-sm font-semibold">
             {currentLine.tokens.map((tok, i) => (
               <span key={i} className="inline-flex flex-col items-center">
                 {tok.chord && (
                   <span
-                    className="text-[11px] font-extrabold px-1.5 py-0.2 rounded mb-0.5"
-                    style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent)' }}
+                    className="text-xs font-bold px-1.5 py-px rounded-md mb-0.5"
+                    style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--chord-color)' }}
                   >
                     {tok.chord}
                   </span>
@@ -236,6 +301,7 @@ export function SimplyPianoPanel({
               </span>
             ))}
           </div>
+          )}
           {nextLine && (
             <div className="text-xs truncate opacity-60" style={{ color: 'var(--text-secondary)' }}>
               Prossima: {nextLine.tokens.map((t) => (t.chord ? `[${t.chord}] ` : '') + t.text).join('')}
@@ -246,69 +312,129 @@ export function SimplyPianoPanel({
 
       {/* Scrolling Note Highway */}
       <div
-        className="relative h-32 overflow-hidden select-none cursor-pointer"
+        className="relative h-40 overflow-hidden select-none cursor-pointer"
         style={{ backgroundColor: 'var(--bg-page)' }}
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const ratio = (e.clientX - rect.left) / rect.width;
-          const targetBeat = Math.max(0, Math.min(totalBeats, currentBeat + (ratio - 0.18) * WINDOW_BEATS));
+          const targetBeat = Math.max(0, Math.min(totalBeats, currentBeat + ((ratio - 0.18) / 0.82) * WINDOW_BEATS));
           onSeekBeat(targetBeat);
         }}
-        title="Clicca sulla barra per saltare a una battuta"
+        title="Clicca per saltare a quel punto del brano"
       >
-        {[20, 40, 60, 80, 100].map((top) => (
-          <div
-            key={top}
-            className="absolute inset-x-0 border-t opacity-20"
-            style={{ top: `${top}%`, borderColor: 'var(--text-secondary)' }}
-          />
-        ))}
+        {/* Chord lane */}
+        <div
+          className="absolute inset-x-0 top-0 border-b"
+          style={{ height: CHORD_LANE_PX, borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-surface-2)' }}
+        />
+
+        {/* Beat / bar grid */}
+        {gridLines.map((g) => {
+          const leftPct = 18 + ((g.beat - currentBeat) / WINDOW_BEATS) * 82;
+          if (leftPct < -2 || leftPct > 102) return null;
+          return (
+            <div
+              key={g.beat}
+              className="absolute bottom-0"
+              style={{
+                left: `${leftPct}%`,
+                top: CHORD_LANE_PX,
+                width: g.isBar ? 2 : 1,
+                backgroundColor: 'var(--text-secondary)',
+                opacity: g.isBar ? 0.35 : 0.1,
+              }}
+            >
+              {g.isBar && (
+                <span
+                  className="absolute bottom-1 left-1 text-[9px] font-mono"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {g.bar}
+                </span>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Chords (accompaniment) on their own lane */}
+        {chordMarkers.map((ev) => {
+          const leftPct = 18 + ((ev.startBeat - currentBeat) / WINDOW_BEATS) * 82;
+          const isNow = activeChord === ev.chord && currentBeat >= ev.startBeat && currentBeat < ev.startBeat + Math.max(ev.durationBeats, 1);
+          return (
+            <span
+              key={`c${ev.id}`}
+              className="absolute px-1.5 rounded text-[10px] font-extrabold whitespace-nowrap leading-[18px]"
+              style={{
+                left: `${leftPct}%`,
+                top: 2,
+                backgroundColor: isNow ? 'var(--accent-warm)' : 'var(--bg-surface)',
+                color: isNow ? 'var(--bg-surface)' : 'var(--accent-warm)',
+                border: '1px solid var(--accent-warm)',
+                zIndex: 12,
+              }}
+            >
+              {formatChord(ev.chord!, notation)}
+            </span>
+          );
+        })}
 
         {/* Playhead line */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 z-20"
+          className="absolute bottom-0 w-0.5 z-20"
           style={{
             left: '18%',
+            top: CHORD_LANE_PX,
             backgroundColor: '#a98467',
             boxShadow: '0 0 10px rgba(169, 132, 103, 0.85)',
           }}
         >
-          <div className="w-3 h-3 -ml-[5px] -mt-0.5 rounded-full" style={{ backgroundColor: '#a98467' }} />
+          <div className="w-3 h-3 -ml-[5px] -mt-1.5 rounded-full" style={{ backgroundColor: '#a98467' }} />
         </div>
 
         {visibleEvents.map((ev) => {
           const leftPct = 18 + ((ev.startBeat - currentBeat) / WINDOW_BEATS) * 82;
-          const widthPct = Math.max(4, (ev.durationBeats / WINDOW_BEATS) * 82 - 0.8);
+          const rawWidth = (ev.durationBeats / WINDOW_BEATS) * 82;
+          const tieHead = !ev.tied && ev.sustainBeats > ev.durationBeats + 1e-6;
+          // Tied notes join into one continuous bar: no gap and no inner rounded corners
+          const widthPct = ev.tied || tieHead ? rawWidth + 0.2 : Math.max(3, rawWidth - 0.8);
           const isNow = currentBeat >= ev.startBeat && currentBeat < ev.startBeat + ev.durationBeats;
-          const mainMidi = ev.midiNotes[0] ?? 60;
-          const clampedMidi = Math.max(55, Math.min(84, mainMidi));
-          const topPct = 76 - ((clampedMidi - 55) / 29) * 58;
+          const mainMidi = ev.midiNotes[ev.midiNotes.length - 1] ?? 60;
+          const span = Math.max(1, keyRange.end - keyRange.start);
+          const clampedMidi = Math.max(keyRange.start, Math.min(keyRange.end, mainMidi));
+          const topPct = 80 - ((clampedMidi - keyRange.start) / span) * 58;
           const noteLabel = midiToNoteName(mainMidi, notation).replace(/\d+$/, '');
+          const isChordNotes = ev.midiNotes.length > 1;
 
           return (
             <div
               key={ev.id}
-              className="absolute flex items-center justify-center rounded-lg px-2 font-bold text-xs shadow-sm transition-colors"
+              className="absolute flex items-center justify-center px-2 font-bold text-xs shadow-sm transition-colors"
               style={{
                 left: `${leftPct}%`,
                 width: `${widthPct}%`,
                 top: `${topPct}%`,
-                height: '26px',
-                backgroundColor: isNow ? '#adc178' : '#6c584cd9',
+                height: '24px',
+                borderRadius: ev.tied
+                  ? tieHead
+                    ? '0'
+                    : '0 var(--radius-lg) var(--radius-lg) 0'
+                  : tieHead
+                  ? 'var(--radius-lg) 0 0 var(--radius-lg)'
+                  : 'var(--radius-lg)',
+                backgroundColor: isNow ? '#adc178' : ev.tied ? '#6c584cb0' : '#6c584cd9',
                 color: isNow ? '#3b3029' : '#f0ead2',
-                transform: isNow ? 'scale(1.06)' : 'scale(1)',
                 zIndex: isNow ? 15 : 10,
+                outline: isChordNotes ? '2px solid #dde5b6' : 'none',
+                outlineOffset: -2,
               }}
+              title={isChordNotes ? ev.midiNotes.map((m) => midiToNoteName(m, notation)).join(' + ') : undefined}
             >
-              {ev.chord && (
-                <span
-                  className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[10px] font-extrabold whitespace-nowrap"
-                  style={{ backgroundColor: '#dde5b6', color: '#3b3029', border: '1px solid #adc178' }}
-                >
-                  {formatChord(ev.chord, notation)}
+              {!ev.tied && (
+                <span className="truncate">
+                  {noteLabel}
+                  {isChordNotes ? ` +${ev.midiNotes.length - 1}` : ''}
                 </span>
               )}
-              <span className="truncate">{noteLabel}</span>
             </div>
           );
         })}
@@ -324,7 +450,7 @@ export function SimplyPianoPanel({
       <div className="p-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
         {instrument === 'piano' ? (
           <div
-            className="relative flex h-28 select-none overflow-x-auto rounded-lg border"
+            className="relative flex h-28 sm:h-32 select-none overflow-x-auto rounded-lg border"
             style={{ borderColor: 'var(--border-color)' }}
           >
             {whiteKeys.map((midi) => {
@@ -339,7 +465,7 @@ export function SimplyPianoPanel({
                 (waitingForMidi !== null && blackMidi % 12 === waitingForMidi % 12);
 
               return (
-                <div key={midi} className="relative flex-1 min-w-[26px] h-full">
+                <div key={midi} className="relative flex-1 min-w-[24px] sm:min-w-[30px] h-full">
                   <button
                     type="button"
                     onClick={() => {

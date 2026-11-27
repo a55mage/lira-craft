@@ -1,5 +1,5 @@
 import type { Instrument } from '../types/music';
-import { normalizeChordToAlpha } from './musicTheory';
+import { normalizeChordToAlpha, splitSlashChord } from './musicTheory';
 
 export interface FrettedDiagram {
   /** Array of frets from lowest string to highest string. -1 = muted (X), 0 = open (O) */
@@ -85,7 +85,7 @@ const ENHARMONIC_LOOKUP: Record<string, string> = {
 };
 
 export function getFrettedDiagram(chordSymbol: string, instrument: Exclude<Instrument, 'piano'>): FrettedDiagram | null {
-  const clean = normalizeChordToAlpha(chordSymbol).split('/')[0];
+  const clean = splitSlashChord(normalizeChordToAlpha(chordSymbol))[0];
   const map = instrument === 'guitar' ? GUITAR_CHORDS : UKULELE_CHORDS;
 
   if (map[clean]) return map[clean];

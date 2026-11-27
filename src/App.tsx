@@ -18,6 +18,7 @@ const DEFAULT_MODULES: ReaderModules = {
   lyricsChords: true,
   chordBar: false,
   noteLabels: true,
+  darkSheet: false,
 };
 
 function getInitialColorScheme(): 'light' | 'dark' | null {
@@ -61,10 +62,29 @@ export default function App() {
   });
 
   const [schemeOverride, setSchemeOverride] = useState<'light' | 'dark' | null>(getInitialColorScheme);
+  const [systemIsDark, setSystemIsDark] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  const isDark = schemeOverride ? schemeOverride === 'dark' : systemIsDark;
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => setSystemIsDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     void ensureSeeded();
   }, []);
+
+  // Every view change starts at the top (otherwise the reader opens scrolled to wherever the
+  // library list was).
+  const pageKey =
+    page.kind === 'library' ? 'library' : page.kind === 'reader' ? `reader:${page.trackId}` : `editor:${page.track?.id ?? 'new'}`;
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pageKey]);
 
   useEffect(() => {
     try {
@@ -92,9 +112,7 @@ export default function App() {
   }, []);
 
   const toggleColorScheme = () => {
-    const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const currentlyDark = schemeOverride ? schemeOverride === 'dark' : systemIsDark;
-    const target: 'light' | 'dark' = currentlyDark ? 'light' : 'dark';
+    const target: 'light' | 'dark' = isDark ? 'light' : 'dark';
     const matchesSystem = (target === 'dark') === systemIsDark;
 
     try {
@@ -139,7 +157,7 @@ export default function App() {
               <span className="font-display text-base sm:text-lg tracking-tight">Lira Craft</span>
             </button>
 
-            <span className="text-xs font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
+            <span className="hidden sm:inline text-xs font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>
               {tracks.length} {tracks.length === 1 ? 'brano' : 'brani'}
             </span>
           </div>
@@ -151,6 +169,7 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer transition hover:opacity-90 shrink-0"
               style={{ backgroundColor: 'var(--accent)' }}
               title="Crea un nuovo brano"
+              aria-label="Nuovo brano"
             >
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Nuovo Brano</span>
@@ -162,9 +181,10 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
               style={{ color: 'var(--text-secondary)' }}
               title="Importa spartito da sito o file"
+              aria-label="Importa spartito"
             >
               <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent-warm)' }} />
-              <span className="hidden lg:inline">Importa</span>
+              <span className="hidden md:inline">Importa</span>
             </button>
 
             <button
@@ -172,10 +192,11 @@ export default function App() {
               onClick={() => setJsonModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
               style={{ color: 'var(--text-secondary)' }}
-              title="Esporta, importa o fai merge della libreria JSON"
+              title="Backup: esporta, importa o unisci la libreria (JSON)"
+              aria-label="Backup libreria"
             >
               <FileJson className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">JSON</span>
+              <span className="hidden md:inline">Backup</span>
             </button>
 
             <button
@@ -184,9 +205,10 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:opacity-75 shrink-0"
               style={{ color: 'var(--text-secondary)' }}
               title="Apri accordatore"
+              aria-label="Accordatore"
             >
               <Mic className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Accordatore</span>
+              <span className="hidden md:inline">Accordatore</span>
             </button>
 
             <button
@@ -197,7 +219,7 @@ export default function App() {
               className="p-1.5 rounded-lg cursor-pointer hover:opacity-75 shrink-0"
               style={{ color: 'var(--text-secondary)' }}
             >
-              {schemeOverride === 'dark' ? (
+              {isDark ? (
                 <Sun className="w-4 h-4" />
               ) : (
                 <Moon className="w-4 h-4" />
@@ -208,7 +230,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main key={pageKey} className="flex-1 view-enter">
         {page.kind === 'editor' ? (
           <TrackEditorPage
             key={page.track?.id ?? 'new'}

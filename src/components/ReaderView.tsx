@@ -18,14 +18,17 @@ import {
   Printer,
   Repeat,
   RotateCcw,
+  ScrollText,
+  SlidersHorizontal,
   Square,
   Timer,
 } from 'lucide-react';
 import { PitchDetector } from 'pitchy';
 import type { NotationSystem, ReaderModules, Track } from '../types/music';
 import { extractUniqueChords, parseChordPro, type ParsedLine } from '../lib/chordPro';
-import { formatChord, suggestBestCapo, transposeChord } from '../lib/musicTheory';
-import { audioEngine, buildTimelineFromChordPro, parseAbcToTimeline } from '../lib/audioEngine';
+import { formatChord, keyPrefersFlats, suggestBestCapo, transposeKey } from '../lib/musicTheory';
+import { audioEngine, buildTimelineFromChordPro, getAbcMeter, parseAbcToTimeline, parseMeter } from '../lib/audioEngine';
+import { usePlayback } from '../hooks/usePlayback';
 import { ChordDiagramCard } from './ChordDiagramCard';
 import { SheetMusicPanel } from './SheetMusicPanel';
 import { SimplyPianoPanel, type WaitModeSource } from './SimplyPianoPanel';
@@ -69,6 +72,71 @@ function groupLyricsBySection(lines: ParsedLine[]): LyricSectionGroup[] {
   return groups;
 }
 
+/** Metronome-style dots: one per pulse in the bar, the current one pulses on every beat. */
+function BeatIndicator({
+  active,
+  currentBeat,
+  beatsPerBar,
+  clickBeats,
+}: {
+  active: boolean;
+  currentBeat: number;
+  beatsPerBar: number;
+  clickBeats: number;
+}) {
+  const pulses = Math.max(1, Math.min(12, Math.round(beatsPerBar / clickBeats)));
+  const posInBar = ((currentBeat % beatsPerBar) + beatsPerBar) % beatsPerBar;
+  const current = Math.min(pulses - 1, Math.floor(posInBar / clickBeats + 1e-6));
+  const pulseIdx = Math.floor(currentBeat / clickBeats + 1e-6);
+  return (
+    <div className="hidden sm:flex items-center gap-1 pl-1" aria-hidden="true">
+      {Array.from({ length: pulses }, (_, i) => {
+        const isCurrent = active && i === current;
+        return (
+          <span
+            key={isCurrent ? `p${pulseIdx}` : `d${i}`}
+            className={`rounded-full ${isCurrent ? 'beat-pulse' : ''}`}
+            style={{
+              width: i === 0 ? 8 : 6,
+              height: i === 0 ? 8 : 6,
+              backgroundColor: isCurrent ? 'var(--accent)' : 'var(--border-color)',
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ToggleChip({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      title={title}
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border font-medium cursor-pointer transition whitespace-nowrap"
+      style={{
+        backgroundColor: active ? 'var(--accent-bg)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-secondary)',
+        borderColor: active ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border-color)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 interface ReaderViewProps {
   track: Track;
   initialVersionId?: string;
@@ -98,11 +166,8 @@ export function ReaderView({
 
   const [transpose, setTranspose] = useState(0);
   const [speedPct, setSpeedPct] = useState(100);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentBeat, setCurrentBeat] = useState(0);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [countInOn, setCountInOn] = useState(false);
-  const [countInRemaining, setCountInRemaining] = useState(0);
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [loopStartBar, setLoopStartBar] = useState(1);
   const [loopEndBar, setLoopEndBar] = useState(4);
@@ -111,39 +176,63 @@ export function ReaderView({
   const [selectedChordPreview, setSelectedChordPreview] = useState<string | null>(null);
   const [lyricsFontSize, setLyricsFontSize] = useState(16);
   const [lyricsColumns, setLyricsColumns] = useState<1 | 2>(1);
+  const [showOptions, setShowOptions] = useState(false);
 
   // Wait Mode state (USB MIDI / Microphone)
   const [waitMode, setWaitMode] = useState<WaitModeSource>('off');
-  const [waitingEventId, setWaitingEventId] = useState<number | null>(null);
   const [detectedLiveMidi, setDetectedLiveMidi] = useState<number | null>(null);
   const [waitModeStatus, setWaitModeStatus] = useState<string | null>(null);
 
-  const satisfiedEventIdsRef = useRef<Set<number>>(new Set());
-  const waitingEventRef = useRef<{ id: number; midi: number } | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   const baseBpm = version?.bpmOverride || track.defaultBpm || 100;
   const effectiveBpm = Math.max(30, Math.round((baseBpm * speedPct) / 100));
 
+  // Spell transposed chords/keys consistently with the destination key (e.g. +1 from C -> Db, not C#)
+  const targetKey = transposeKey(track.originalKey, transpose);
+  const preferFlats = transpose === 0 ? undefined : keyPrefersFlats(targetKey);
+
+  const abcMeter = version ? getAbcMeter(version.abcNotation) : null;
+  const meterSource = abcMeter ?? track.timeSignature;
+  const meter = useMemo(() => parseMeter(meterSource), [meterSource]);
+  const beatsPerBar = meter.beatsPerBar;
+
   const timeline = useMemo(() => {
     if (!version) return [];
-    const fromAbc = parseAbcToTimeline(version.abcNotation, transpose);
+    const fromAbc = parseAbcToTimeline(version.abcNotation, transpose, preferFlats);
     if (fromAbc.length > 0) return fromAbc;
-    return buildTimelineFromChordPro(version.lyricsChords, transpose);
-  }, [version, transpose]);
+    return buildTimelineFromChordPro(version.lyricsChords, transpose, beatsPerBar, preferFlats);
+  }, [version, transpose, preferFlats, beatsPerBar]);
 
   const totalBeats = useMemo(() => {
     if (timeline.length === 0) return 16;
     const last = timeline[timeline.length - 1];
-    return Math.max(4, last.startBeat + last.durationBeats);
-  }, [timeline]);
+    return Math.max(beatsPerBar, last.startBeat + last.durationBeats);
+  }, [timeline, beatsPerBar]);
 
-  const totalBars = Math.max(1, Math.ceil(totalBeats / 4));
+  const totalBars = Math.max(1, Math.ceil(totalBeats / beatsPerBar - 1e-6));
+
+  const loopStartBeat = (loopStartBar - 1) * beatsPerBar;
+  const loopEndBeat = Math.min(totalBeats, loopEndBar * beatsPerBar);
+
+  const playback = usePlayback({
+    timeline,
+    totalBeats,
+    bpm: effectiveBpm,
+    meter,
+    instrument: version?.instrument ?? 'piano',
+    metronomeOn,
+    countInOn,
+    loop: { enabled: loopEnabled, startBeat: loopStartBeat, endBeat: loopEndBeat },
+    waitActive: waitMode !== 'off',
+  });
+  const { isPlaying, currentBeat, countInRemaining, waitingEventId } = playback;
+  const seekTo = playback.seek;
 
   const parsedLyrics = useMemo(() => {
     if (!version) return [];
-    return parseChordPro(version.lyricsChords, transpose, notation);
-  }, [version, transpose, notation]);
+    return parseChordPro(version.lyricsChords, transpose, notation, preferFlats);
+  }, [version, transpose, notation, preferFlats]);
 
   const lyricSections = useMemo(() => groupLyricsBySection(parsedLyrics), [parsedLyrics]);
 
@@ -193,8 +282,8 @@ export function ReaderView({
 
   const uniqueChords = useMemo(() => {
     if (!version) return [];
-    return extractUniqueChords(version.lyricsChords, version.abcNotation, transpose);
-  }, [version, transpose]);
+    return extractUniqueChords(version.lyricsChords, version.abcNotation, transpose, preferFlats);
+  }, [version, transpose, preferFlats]);
 
   const capoSuggestion = useMemo(() => {
     if (!version || version.instrument === 'piano') return null;
@@ -226,33 +315,20 @@ export function ReaderView({
     return ev?.midiNotes[0] ?? null;
   }, [timeline, waitingEventId]);
 
-  useEffect(() => {
-    if (waitingEventId !== null && waitingForMidi !== null) {
-      waitingEventRef.current = { id: waitingEventId, midi: waitingForMidi };
-    } else {
-      waitingEventRef.current = null;
-    }
-  }, [waitingEventId, waitingForMidi]);
-
-  const handleUserNotePlayed = useCallback((playedMidi: number) => {
-    setDetectedLiveMidi(playedMidi);
-    const waiting = waitingEventRef.current;
-    if (!waiting) return;
-    // Match by pitch class so beginners can play in any octave
-    if (playedMidi % 12 === waiting.midi % 12) {
-      satisfiedEventIdsRef.current.add(waiting.id);
-      waitingEventRef.current = null;
-      setWaitingEventId(null);
-    }
-  }, []);
+  const notifyNotePlayed = playback.notifyNotePlayed;
+  const handleUserNotePlayed = useCallback(
+    (playedMidi: number) => {
+      setDetectedLiveMidi(playedMidi);
+      notifyNotePlayed(playedMidi);
+    },
+    [notifyNotePlayed]
+  );
 
   // Wait Mode Input Listener: Web MIDI API or Microphone Pitch Detection
   useEffect(() => {
     if (waitMode === 'off') {
       setWaitModeStatus(null);
       setDetectedLiveMidi(null);
-      setWaitingEventId(null);
-      satisfiedEventIdsRef.current.clear();
       return;
     }
 
@@ -348,81 +424,6 @@ export function ReaderView({
     }
   }, [waitMode, handleUserNotePlayed]);
 
-  // Playback loop
-  const lastTriggeredEventId = useRef<number>(-1);
-  const lastMetronomeBeat = useRef<number>(-1);
-
-  useEffect(() => {
-    if (!isPlaying || !version) return;
-
-    let rafId = 0;
-    let lastTime = performance.now();
-
-    const tick = (now: number) => {
-      const dtSec = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // In Wait Mode, pause time advancement while waiting for user input on the current note
-      if (waitMode !== 'off' && waitingEventRef.current !== null) {
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-
-      const deltaBeats = dtSec * (effectiveBpm / 60);
-
-      setCurrentBeat((prev) => {
-        let next = prev + deltaBeats;
-        const loopStartBeat = (loopStartBar - 1) * 4;
-        const loopEndBeat = Math.min(totalBeats, loopEndBar * 4);
-
-        if (loopEnabled && loopEndBeat > loopStartBeat && next >= loopEndBeat) {
-          next = loopStartBeat;
-          lastTriggeredEventId.current = -1;
-          lastMetronomeBeat.current = -1;
-          satisfiedEventIdsRef.current.clear();
-        } else if (next >= totalBeats) {
-          setIsPlaying(false);
-          lastTriggeredEventId.current = -1;
-          satisfiedEventIdsRef.current.clear();
-          return 0;
-        }
-
-        if (metronomeOn) {
-          const wholeBeat = Math.floor(next);
-          if (wholeBeat !== lastMetronomeBeat.current) {
-            lastMetronomeBeat.current = wholeBeat;
-            audioEngine.playMetronomeClick(wholeBeat % 4 === 0);
-          }
-        }
-
-        const ev = timeline.find((e) => next >= e.startBeat && next < e.startBeat + e.durationBeats);
-        if (ev && ev.id !== lastTriggeredEventId.current) {
-          // If Wait Mode is active and this note hasn't been played yet, hold right on it
-          if (waitMode !== 'off' && !satisfiedEventIdsRef.current.has(ev.id)) {
-            const targetMidi = ev.midiNotes[0] ?? 60;
-            waitingEventRef.current = { id: ev.id, midi: targetMidi };
-            setWaitingEventId(ev.id);
-            return ev.startBeat;
-          }
-
-          lastTriggeredEventId.current = ev.id;
-          const durSec = (ev.durationBeats * 60) / effectiveBpm;
-          ev.midiNotes.forEach((m) => audioEngine.playNote(m, durSec, version.instrument));
-          if (ev.chord) {
-            audioEngine.playChord(ev.chord, version.instrument, Math.min(1.4, durSec * 2), 0.08);
-          }
-        }
-
-        return next;
-      });
-
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, effectiveBpm, totalBeats, timeline, version, metronomeOn, loopEnabled, loopStartBar, loopEndBar, waitMode]);
-
   // Auto-scroll for lyrics view
   useEffect(() => {
     if (!autoScroll || !isPlaying) return;
@@ -432,71 +433,34 @@ export function ReaderView({
     return () => window.clearInterval(interval);
   }, [autoScroll, isPlaying, effectiveBpm]);
 
-  const handlePlayToggle = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-      return;
-    }
+  const handlePlayToggle = () => playback.toggle();
 
-    audioEngine.getContext();
-    if (countInOn && currentBeat === 0) {
-      let step = 4;
-      setCountInRemaining(step);
-      audioEngine.playMetronomeClick(true);
-      const beatMs = (60 / effectiveBpm) * 1000;
-      const timer = window.setInterval(() => {
-        step--;
-        if (step <= 0) {
-          window.clearInterval(timer);
-          setCountInRemaining(0);
-          lastTriggeredEventId.current = -1;
-          lastMetronomeBeat.current = -1;
-          setIsPlaying(true);
-        } else {
-          setCountInRemaining(step);
-          audioEngine.playMetronomeClick(false);
-        }
-      }, beatMs);
-    } else {
-      lastTriggeredEventId.current = -1;
-      lastMetronomeBeat.current = -1;
-      setIsPlaying(true);
-    }
-  };
-
-  const handleStop = () => {
-    setIsPlaying(false);
-    setCurrentBeat(loopEnabled ? (loopStartBar - 1) * 4 : 0);
-    setWaitingEventId(null);
-    waitingEventRef.current = null;
-    satisfiedEventIdsRef.current.clear();
-    lastTriggeredEventId.current = -1;
-    lastMetronomeBeat.current = -1;
-  };
+  const handleStop = () => playback.stop(loopEnabled ? loopStartBeat : 0);
 
   const toggleModule = (key: keyof ReaderModules) => {
     onChangeModules({ ...modules, [key]: !modules[key] });
   };
 
-  const currentKeyDisplay = formatChord(transposeChord(track.originalKey, transpose), notation);
+  const currentKeyDisplay = formatChord(targetKey, notation);
 
   if (!version) return null;
 
   return (
     <>
-    <div className={`mx-auto px-4 pt-3 pb-20 space-y-3 animate-fade-up ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
-      {/* Compact Track Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 no-print">
+    <div className={`mx-auto px-4 pt-3 pb-36 sm:pb-24 space-y-3 ${performanceMode ? 'max-w-5xl' : 'max-w-7xl'}`}>
+      {/* Track header */}
+      <div className="flex items-center justify-between gap-2 no-print">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={() => {
-              setIsPlaying(false);
+              playback.pause();
               onBack();
             }}
-            className="p-1.5 rounded-lg cursor-pointer hover:opacity-70"
+            className="p-2 -ml-2 rounded-lg cursor-pointer hover:opacity-70"
             style={{ color: 'var(--text-secondary)' }}
             aria-label="Torna alla libreria"
+            title="Torna alla libreria"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -512,137 +476,137 @@ export function ReaderView({
             </h1>
             <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
               {track.artist} · <strong className="font-mono">{currentKeyDisplay}</strong> ·{' '}
-              <span className="font-mono">{effectiveBpm} BPM</span> · {track.timeSignature}
+              <span className="font-mono">{effectiveBpm} BPM</span> · {meterSource}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="relative">
-            <select
-              value={version.id}
-              onChange={(e) => {
-                handleStop();
-                setVersionId(e.target.value);
-              }}
-              aria-label="Seleziona versione brano"
-              className="appearance-none pl-2 pr-6 py-1 rounded-lg bg-transparent font-semibold cursor-pointer"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {track.versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {INSTRUMENT_NAME[v.instrument]} — {v.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-          </div>
-
+        <div className="flex items-center gap-0.5 sm:gap-1 text-xs shrink-0">
           <button
             type="button"
             onClick={() => setPerformanceMode((p) => !p)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer"
+            aria-pressed={performanceMode}
+            aria-label="Modalità leggio"
+            title="Modalità Leggio / Mani Libere"
+            className="inline-flex items-center gap-1 p-2 sm:px-2 sm:py-1.5 rounded-lg font-medium cursor-pointer"
             style={{
               color: performanceMode ? 'var(--accent)' : 'var(--text-secondary)',
               backgroundColor: performanceMode ? 'var(--accent-bg)' : 'transparent',
             }}
-            title="Modalità Leggio / Mani Libere"
           >
             {performanceMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            Leggio
+            <span className="hidden sm:inline">Leggio</span>
           </button>
-
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer hover:opacity-75"
-            style={{ color: 'var(--text-secondary)' }}
+            aria-label="Stampa o salva in PDF"
             title="Stampa o salva in PDF"
+            className="inline-flex items-center gap-1 p-2 sm:px-2 sm:py-1.5 rounded-lg font-medium cursor-pointer hover:opacity-75"
+            style={{ color: 'var(--text-secondary)' }}
           >
             <Printer className="w-3.5 h-3.5" />
-            PDF
+            <span className="hidden sm:inline">PDF</span>
           </button>
-
           <button
             type="button"
             onClick={() => onEditTrack(track)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-medium cursor-pointer hover:opacity-75"
+            aria-label="Modifica brano"
+            title="Modifica brano"
+            className="inline-flex items-center gap-1 p-2 sm:px-2 sm:py-1.5 rounded-lg font-medium cursor-pointer hover:opacity-75"
             style={{ color: 'var(--accent)' }}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            Modifica
+            <span className="hidden sm:inline">Modifica</span>
           </button>
         </div>
       </div>
 
-      {/* Flat Modular Control Strip (no nested box/pills) */}
+      {/* Control strip: version + visible modules, then practice tools (collapsible on mobile) */}
       {!performanceMode && (
-        <div
-          className="pb-2.5 border-b space-y-2 no-print"
-          style={{ borderColor: 'var(--border-color)' }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                <Eye className="w-3.5 h-3.5" />
-              </span>
-              {(
-                [
-                  { key: 'sheet', label: 'Spartito' },
-                  { key: 'simplyPiano', label: 'Player Guidato' },
-                  { key: 'lyricsChords', label: 'Lyrics + Accordi' },
-                  { key: 'chordBar', label: 'Accordi in alto' },
-                ] as const
-              ).map((item) => {
-                const active = modules[item.key];
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => toggleModule(item.key)}
-                    className="py-0.5 font-medium border-b-2 transition cursor-pointer"
-                    style={{
-                      borderColor: active ? 'var(--accent)' : 'transparent',
-                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+        <div className="pb-2.5 border-b space-y-2 no-print" style={{ borderColor: 'var(--border-color)' }}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+            <div className="relative min-w-0 max-w-full">
+              <select
+                value={version.id}
+                onChange={(e) => {
+                  handleStop();
+                  setVersionId(e.target.value);
+                }}
+                aria-label="Seleziona versione brano"
+                className="appearance-none max-w-[15rem] truncate pl-2.5 pr-7 py-1.5 rounded-lg border font-semibold cursor-pointer"
+                style={{
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'var(--border-color)',
+                }}
+              >
+                {track.versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {INSTRUMENT_NAME[v.instrument]} — {v.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMetronomeOn((v) => !v)}
-                className="inline-flex items-center gap-1 font-medium cursor-pointer"
-                style={{ color: metronomeOn ? 'var(--accent)' : 'var(--text-muted)' }}
-              >
-                <Timer className="w-3.5 h-3.5" /> Metronomo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCountInOn((v) => !v)}
-                className="font-mono font-medium cursor-pointer"
-                style={{ color: countInOn ? 'var(--accent)' : 'var(--text-muted)' }}
-                title="4 battiti di conteggio prima di iniziare"
-              >
-                1-2-3-4
-              </button>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setLoopEnabled((v) => !v)}
-                  className="inline-flex items-center gap-1 font-medium cursor-pointer"
-                  style={{ color: loopEnabled ? 'var(--accent)' : 'var(--text-muted)' }}
+            <div role="group" aria-label="Moduli visibili" className="flex items-center gap-1">
+              {(
+                [
+                  { key: 'sheet', label: 'Spartito', short: 'Spartito' },
+                  { key: 'simplyPiano', label: 'Player guidato', short: 'Player' },
+                  { key: 'lyricsChords', label: 'Testo e accordi', short: 'Testo' },
+                  { key: 'chordBar', label: 'Accordi in alto', short: 'Accordi' },
+                ] as const
+              ).map((item) => (
+                <ToggleChip
+                  key={item.key}
+                  active={modules[item.key]}
+                  onClick={() => toggleModule(item.key)}
+                  title={`Mostra/nascondi: ${item.label}`}
                 >
+                  <span className="sm:hidden">{item.short}</span>
+                  <span className="hidden sm:inline">{item.label}</span>
+                </ToggleChip>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowOptions((v) => !v)}
+              aria-expanded={showOptions}
+              aria-controls="reader-practice-tools"
+              className="md:hidden ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg border font-medium cursor-pointer"
+              style={{
+                borderColor: 'var(--border-color)',
+                color: showOptions ? 'var(--accent)' : 'var(--text-secondary)',
+                backgroundColor: showOptions ? 'var(--accent-bg)' : 'transparent',
+              }}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Opzioni
+            </button>
+
+            <div
+              id="reader-practice-tools"
+              className={`${showOptions ? 'flex' : 'hidden'} md:flex flex-wrap items-center gap-1 w-full md:w-auto md:ml-auto`}
+            >
+              <div role="group" aria-label="Strumenti di pratica" className="flex flex-wrap items-center gap-1">
+                <ToggleChip active={metronomeOn} onClick={() => setMetronomeOn((v) => !v)} title="Metronomo">
+                  <Timer className="w-3.5 h-3.5" /> Metronomo
+                </ToggleChip>
+                <ToggleChip
+                  active={countInOn}
+                  onClick={() => setCountInOn((v) => !v)}
+                  title="Una battuta di conteggio prima di iniziare"
+                >
+                  <span className="font-mono">1·2·3·4</span>
+                </ToggleChip>
+                <ToggleChip active={loopEnabled} onClick={() => setLoopEnabled((v) => !v)} title="Ripeti un gruppo di battute">
                   <Repeat className="w-3.5 h-3.5" /> Loop
-                </button>
+                </ToggleChip>
                 {loopEnabled && (
-                  <>
+                  <span className="inline-flex items-center gap-1 font-mono">
                     <input
                       type="number"
                       min={1}
@@ -650,10 +614,10 @@ export function ReaderView({
                       value={loopStartBar}
                       onChange={(e) => setLoopStartBar(Math.max(1, Number(e.target.value)))}
                       aria-label="Battuta inizio loop"
-                      className="w-10 px-1 py-0.5 rounded border text-center font-mono"
+                      className="w-11 px-1 py-1 rounded-lg border text-center"
                       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
                     />
-                    <span>–</span>
+                    <span style={{ color: 'var(--text-muted)' }}>–</span>
                     <input
                       type="number"
                       min={loopStartBar}
@@ -661,47 +625,51 @@ export function ReaderView({
                       value={loopEndBar}
                       onChange={(e) => setLoopEndBar(Math.max(loopStartBar, Number(e.target.value)))}
                       aria-label="Battuta fine loop"
-                      className="w-10 px-1 py-0.5 rounded border text-center font-mono"
+                      className="w-11 px-1 py-1 rounded-lg border text-center"
                       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
                     />
-                  </>
+                  </span>
                 )}
               </div>
 
-              <div className="inline-flex items-center gap-1.5 pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
-                <button
-                  type="button"
-                  onClick={() => onChangeNotation('alpha')}
-                  className="font-medium cursor-pointer"
-                  style={{
-                    color: notation === 'alpha' ? 'var(--accent)' : 'var(--text-muted)',
-                    textDecoration: notation === 'alpha' ? 'underline' : 'none',
-                  }}
-                >
-                  C·D·E
-                </button>
-                <span style={{ color: 'var(--text-muted)' }}>/</span>
-                <button
-                  type="button"
-                  onClick={() => onChangeNotation('latin')}
-                  className="font-medium cursor-pointer"
-                  style={{
-                    color: notation === 'latin' ? 'var(--accent)' : 'var(--text-muted)',
-                    textDecoration: notation === 'latin' ? 'underline' : 'none',
-                  }}
-                >
-                  Do·Re·Mi
-                </button>
+              <span className="hidden md:block w-px h-5 mx-1.5" style={{ backgroundColor: 'var(--border-color)' }} />
+
+              <div
+                role="group"
+                aria-label="Notazione"
+                className="inline-flex items-center rounded-lg p-0.5 border"
+                style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-surface-2)' }}
+              >
+                {(
+                  [
+                    { key: 'alpha', label: 'C·D·E' },
+                    { key: 'latin', label: 'Do·Re·Mi' },
+                  ] as const
+                ).map((n) => (
+                  <button
+                    key={n.key}
+                    type="button"
+                    aria-pressed={notation === n.key}
+                    onClick={() => onChangeNotation(n.key)}
+                    className="px-2 py-0.5 rounded-md font-medium cursor-pointer transition"
+                    style={{
+                      backgroundColor: notation === n.key ? 'var(--bg-surface)' : 'transparent',
+                      color: notation === n.key ? 'var(--accent)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {n.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
           {(version.notes || (capoSuggestion && capoSuggestion.capo > 0)) && (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5 text-xs">
               {version.notes && (
-                <div className="inline-flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  <Lightbulb className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent-warm)' }} />
-                  <span>{version.notes}</span>
+                <div className="flex items-start gap-1.5 min-w-0" style={{ color: 'var(--text-secondary)' }}>
+                  <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-px" style={{ color: 'var(--accent-warm)' }} />
+                  <span className="line-clamp-2 sm:line-clamp-none">{version.notes}</span>
                 </div>
               )}
               {capoSuggestion && capoSuggestion.capo > 0 && (
@@ -755,13 +723,8 @@ export function ReaderView({
           detectedLiveMidi={detectedLiveMidi}
           waitModeStatus={waitModeStatus}
           onUserNotePlayed={handleUserNotePlayed}
-          onSeekBeat={(beat) => {
-            setCurrentBeat(beat);
-            setWaitingEventId(null);
-            waitingEventRef.current = null;
-            satisfiedEventIdsRef.current.clear();
-            lastTriggeredEventId.current = -1;
-          }}
+          onSeekBeat={seekTo}
+          beatsPerBar={beatsPerBar}
         />
       )}
 
@@ -771,8 +734,10 @@ export function ReaderView({
           abcNotation={version.abcNotation}
           transposeSemitones={transpose}
           notation={notation}
-          activeEventIndex={activeEventIndex}
+          activeNoteIndex={activeEvent?.noteIndex ?? -1}
           showNoteLabels={modules.noteLabels}
+          darkSheet={modules.darkSheet}
+          onToggleDarkSheet={() => toggleModule('darkSheet')}
         />
       )}
 
@@ -918,6 +883,52 @@ export function ReaderView({
                       }
                       const meta = lyricPlaybackIndex.lineMeta.get(`${sIdx}-${idx}`);
                       const isCurrentLine = meta !== undefined && meta.lineIdx === activeLyricLineIdx;
+                      const chordFontPx = Math.max(13, Math.round(lyricsFontSize * 0.9));
+
+                      // Instrumental / chord-only line: show it as a grid of bars instead of floating chords
+                      const isChordOnly =
+                        line.tokens.some((t) => t.chord) && line.tokens.every((t) => !t.text.trim());
+                      if (isChordOnly) {
+                        return (
+                          <div
+                            key={idx}
+                            className="flex flex-wrap gap-1.5 mb-2 rounded-lg px-2 -mx-2 py-1 transition-colors duration-200"
+                            style={{
+                              backgroundColor: isCurrentLine
+                                ? 'color-mix(in srgb, var(--accent-bg) 55%, transparent)'
+                                : 'transparent',
+                            }}
+                          >
+                            {line.tokens.map((tok, tIdx) => {
+                              if (!tok.chord) return null;
+                              const occ = meta?.chordIndices.get(tIdx);
+                              const isCurrent = occ !== undefined && occ === activeLyricChordIdx;
+                              return (
+                                <button
+                                  key={tIdx}
+                                  type="button"
+                                  onClick={() => {
+                                    if (tok.rawChord) {
+                                      audioEngine.playChord(tok.rawChord, version.instrument);
+                                      setSelectedChordPreview(tok.rawChord);
+                                    }
+                                  }}
+                                  className="min-w-[3.5rem] px-2.5 py-1.5 rounded-lg border font-bold text-center cursor-pointer transition"
+                                  style={{
+                                    fontSize: `${chordFontPx}px`,
+                                    borderColor: isCurrent ? 'var(--accent)' : 'var(--border-color)',
+                                    backgroundColor: isCurrent ? 'var(--accent)' : 'var(--bg-surface)',
+                                    color: isCurrent ? 'var(--bg-surface)' : 'var(--chord-color)',
+                                  }}
+                                  title="Clicca per ascoltare l'accordo"
+                                >
+                                  {tok.chord}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
 
                       return (
                         <div
@@ -933,12 +944,10 @@ export function ReaderView({
                             const chordOccIdx = meta?.chordIndices.get(tIdx);
                             const isCurrentChord =
                               chordOccIdx !== undefined && chordOccIdx === activeLyricChordIdx;
-                            const isMidWord =
-                              Boolean(tok.chord) &&
-                              tok.text.length > 0 &&
-                              !tok.text.startsWith(' ') &&
-                              tIdx > 0 &&
-                              !line.tokens[tIdx - 1].text.endsWith(' ');
+                            // Only pad a chord when it is wider than the syllable below it, so
+                            // words are not pushed apart by a fixed margin.
+                            const chordWider =
+                              Boolean(tok.chord) && tok.text.trimEnd().length <= (tok.chord?.length ?? 0) + 1;
                             return (
                               <span key={tIdx} className="inline-flex flex-col items-start">
                                 {tok.chord ? (
@@ -950,18 +959,19 @@ export function ReaderView({
                                         setSelectedChordPreview(tok.rawChord);
                                       }
                                     }}
-                                    className={`font-extrabold leading-none mb-0.5 cursor-pointer transition-all duration-150 ${isMidWord ? '' : 'mr-1.5'} ${isCurrentChord ? 'px-1.5 py-0.5 rounded-md shadow-sm scale-105' : ''}`}
+                                    className={`font-bold leading-none mb-1 -ml-0.5 px-0.5 rounded-md cursor-pointer transition-colors duration-150 ${chordWider ? 'pr-2' : ''}`}
                                     style={{
-                                      fontSize: `${Math.max(12, Math.round(lyricsFontSize * 0.82))}px`,
+                                      fontSize: `${chordFontPx}px`,
                                       backgroundColor: isCurrentChord ? 'var(--accent)' : 'transparent',
-                                      color: isCurrentChord ? '#ffffff' : 'var(--accent)',
+                                      color: isCurrentChord ? 'var(--bg-surface)' : 'var(--chord-color)',
+                                      boxShadow: isCurrentChord ? '0 0 0 3px var(--accent)' : 'none',
                                     }}
                                     title="Clicca per ascoltare l'accordo"
                                   >
                                     {tok.chord}
                                   </button>
                                 ) : (
-                                  <span className="h-5" />
+                                  <span aria-hidden="true" style={{ height: `${chordFontPx + 4}px` }} />
                                 )}
                                 <span
                                   className={`whitespace-pre-wrap ${isCurrentLine ? 'font-medium' : ''}`}
@@ -980,28 +990,35 @@ export function ReaderView({
             </div>
           </div>
 
-          {/* Sticky Right Chord Diagrams Sidebar (flat divider instead of heavy nested card) */}
+          {/* Chord diagrams: sticky sidebar on large screens, horizontal strip below */}
           {uniqueChords.length > 0 && (
             <aside
-              className="lg:sticky lg:top-16 lg:border-l lg:pl-4 space-y-2.5 max-h-[calc(100vh-7rem)] overflow-y-auto no-print"
+              className="min-w-0 lg:sticky lg:top-16 lg:border-l lg:pl-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto no-print"
               style={{ borderColor: 'var(--border-color)' }}
+              aria-label="Diagrammi accordi"
             >
-              <div className="flex items-center justify-between pb-1">
+              <div className="flex items-center justify-between pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                   Accordi ({uniqueChords.length})
                 </span>
+                {uniqueChords.length > 3 && (
+                  <span className="lg:hidden text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    scorri →
+                  </span>
+                )}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2">
+              <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scroll-px-4 pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-2 lg:overflow-visible lg:pb-0">
                 {uniqueChords.map((chord) => (
-                  <ChordDiagramCard
-                    key={chord}
-                    chord={chord}
-                    instrument={version.instrument}
-                    notation={notation}
-                    compact
-                    isActive={activeChord === chord || selectedChordPreview === chord}
-                    onSelect={() => setSelectedChordPreview(chord)}
-                  />
+                  <div key={chord} className="shrink-0 snap-start lg:shrink">
+                    <ChordDiagramCard
+                      chord={chord}
+                      instrument={version.instrument}
+                      notation={notation}
+                      compact
+                      isActive={activeChord === chord || selectedChordPreview === chord}
+                      onSelect={() => setSelectedChordPreview(chord)}
+                    />
+                  </div>
                 ))}
               </div>
             </aside>
@@ -1027,11 +1044,7 @@ export function ReaderView({
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            setCurrentBeat(ratio * totalBeats);
-            setWaitingEventId(null);
-            waitingEventRef.current = null;
-            satisfiedEventIdsRef.current.clear();
-            lastTriggeredEventId.current = -1;
+            seekTo(ratio * totalBeats);
           }}
           title="Clicca per spostarti nel brano"
         >
@@ -1044,24 +1057,25 @@ export function ReaderView({
           />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
-          {/* Transport */}
-          <div className="flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Transport + beat indicator */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handlePlayToggle}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
-              style={{ backgroundColor: 'var(--accent)' }}
+              aria-label={countInRemaining > 0 ? 'Annulla conteggio' : isPlaying ? 'Pausa' : 'Riproduci'}
+              className={`inline-flex items-center justify-center gap-1.5 min-w-[5.5rem] px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition hover:opacity-90 ${countInRemaining > 0 ? 'count-in-pulse' : ''}`}
+              style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-surface)' }}
             >
               {countInRemaining > 0 ? (
-                <>Conto: {countInRemaining}</>
+                <span className="font-mono">Conto {countInRemaining}</span>
               ) : isPlaying ? (
                 <>
-                  <Pause className="w-3.5 h-3.5" /> Pausa
+                  <Pause className="w-4 h-4" /> Pausa
                 </>
               ) : (
                 <>
-                  <Play className="w-3.5 h-3.5" /> Play
+                  <Play className="w-4 h-4" /> Play
                 </>
               )}
             </button>
@@ -1069,103 +1083,103 @@ export function ReaderView({
               type="button"
               onClick={handleStop}
               aria-label="Stop"
-              className="p-1.5 rounded-xl border cursor-pointer"
+              title="Stop (torna all'inizio)"
+              className="p-2 rounded-xl border cursor-pointer"
               style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
             >
-              <Square className="w-3.5 h-3.5" />
+              <Square className="w-4 h-4" />
             </button>
-            <span className="hidden md:inline text-xs font-medium truncate max-w-[180px]" style={{ color: 'var(--text-secondary)' }}>
-              {track.title}
-            </span>
+            <BeatIndicator
+              active={isPlaying && countInRemaining === 0}
+              currentBeat={currentBeat}
+              beatsPerBar={beatsPerBar}
+              clickBeats={meter.clickBeats}
+            />
           </div>
 
-          {/* Progress Scrubber */}
-          <div className="flex items-center gap-2 flex-1 min-w-[130px] max-w-sm text-[11px]">
+          {/* Position */}
+          <div className="flex items-center gap-2 flex-1 min-w-[120px] text-[11px]">
             <input
               type="range"
               min={0}
               max={totalBeats}
               step={0.5}
               value={Math.min(totalBeats, currentBeat)}
-              onChange={(e) => {
-                setCurrentBeat(Number(e.target.value));
-                setWaitingEventId(null);
-                waitingEventRef.current = null;
-                satisfiedEventIdsRef.current.clear();
-                lastTriggeredEventId.current = -1;
-              }}
+              onChange={(e) => seekTo(Number(e.target.value))}
               aria-label="Posizione brano"
               className="flex-1"
               style={{ accentColor: 'var(--accent)' }}
             />
-            <span className="font-mono shrink-0" style={{ color: 'var(--text-secondary)' }}>
-              {Math.floor(currentBeat / 4) + 1}/{totalBars}
+            <span className="font-mono shrink-0" style={{ color: 'var(--text-secondary)' }} title="Battuta corrente / totale">
+              {Math.min(totalBars, Math.floor(currentBeat / beatsPerBar + 1e-6) + 1)}/{totalBars}
             </span>
           </div>
 
-          {/* Speed */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <Gauge className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
-            <input
-              type="range"
-              min={50}
-              max={150}
-              step={5}
-              value={speedPct}
-              onChange={(e) => setSpeedPct(Number(e.target.value))}
-              aria-label="Velocità di riproduzione"
-              className="w-16 sm:w-20"
-              style={{ accentColor: 'var(--accent)' }}
-            />
-            <span className="font-mono text-[11px] font-semibold w-9">{speedPct}%</span>
-          </div>
+          {/* Tempo, key, scroll */}
+          <div
+            className="flex items-center justify-between sm:justify-start gap-4 text-xs w-full sm:w-auto sm:pl-4 sm:border-l"
+            style={{ borderColor: 'var(--border-color)' }}
+          >
+            <div role="group" aria-label="Velocità" className="flex items-center gap-1.5" title="Velocità di riproduzione">
+              <Gauge className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+              <input
+                type="range"
+                min={50}
+                max={150}
+                step={5}
+                value={speedPct}
+                onChange={(e) => setSpeedPct(Number(e.target.value))}
+                onDoubleClick={() => setSpeedPct(100)}
+                aria-label="Velocità di riproduzione"
+                className="w-16 sm:w-20"
+                style={{ accentColor: 'var(--accent)' }}
+              />
+              <span className="font-mono text-[11px] font-semibold w-9">{speedPct}%</span>
+            </div>
 
-          {/* Transpose */}
-          <div className="flex items-center gap-1 text-xs">
-            <Music2 className="w-3.5 h-3.5 hidden sm:block" style={{ color: 'var(--text-secondary)' }} />
-            <button
-              type="button"
-              onClick={() => setTranspose((t) => t - 1)}
-              aria-label="Abbassa tonalità di 1 semitono"
-              className="w-6 h-6 rounded-lg border font-bold cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-            >
-              -
-            </button>
-            <span className="w-7 text-center font-mono text-[11px] font-semibold">
-              {transpose > 0 ? `+${transpose}` : transpose}
-            </span>
-            <button
-              type="button"
-              onClick={() => setTranspose((t) => t + 1)}
-              aria-label="Alza tonalità di 1 semitono"
-              className="w-6 h-6 rounded-lg border font-bold cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
-            >
-              +
-            </button>
-            {transpose !== 0 && (
+            <div role="group" aria-label="Tonalità" className="flex items-center gap-1" title="Trasposizione in semitoni">
+              <Music2 className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => t - 1)}
+                aria-label="Abbassa tonalità di 1 semitono"
+                title="Abbassa di un semitono"
+                className="w-7 h-7 rounded-lg border font-bold cursor-pointer"
+                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              >
+                −
+              </button>
+              <span
+                className="w-7 text-center font-mono text-[11px] font-semibold"
+                style={{ color: transpose !== 0 ? 'var(--accent)' : undefined }}
+              >
+                {transpose > 0 ? `+${transpose}` : transpose}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => t + 1)}
+                aria-label="Alza tonalità di 1 semitono"
+                title="Alza di un semitono"
+                className="w-7 h-7 rounded-lg border font-bold cursor-pointer"
+                style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border-color)' }}
+              >
+                +
+              </button>
               <button
                 type="button"
                 onClick={() => setTranspose(0)}
                 title="Ripristina tonalità originale"
-                className="p-1 rounded-lg cursor-pointer opacity-70 hover:opacity-100"
+                aria-label="Ripristina tonalità originale"
+                className={`p-1 rounded-lg cursor-pointer opacity-70 hover:opacity-100 ${transpose === 0 ? 'invisible' : ''}`}
               >
                 <RotateCcw className="w-3 h-3" />
               </button>
-            )}
-          </div>
+            </div>
 
-          {/* Auto-scroll */}
-          <label className="inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              checked={autoScroll}
-              onChange={(e) => setAutoScroll(e.target.checked)}
-              style={{ accentColor: 'var(--accent)' }}
-            />
-            <span className="hidden sm:inline">Auto-scroll</span>
-          </label>
+            <ToggleChip active={autoScroll} onClick={() => setAutoScroll((v) => !v)} title="Scorrimento automatico durante la riproduzione">
+              <ScrollText className="w-3.5 h-3.5" /> Scroll
+            </ToggleChip>
+          </div>
         </div>
       </div>
     </>

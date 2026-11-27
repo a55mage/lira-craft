@@ -47,6 +47,7 @@ export interface ReaderModules {
   lyricsChords: boolean;
   chordBar: boolean;
   noteLabels: boolean;
+  darkSheet: boolean;
 }
 
 export interface UserPreferences {

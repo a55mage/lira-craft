@@ -246,7 +246,7 @@ export function TrackEditorPage({
       : '\nA|----------------|\nE|----------------|\nC|----------------|\nG|----------------|\n';
 
   return (
-    <form onSubmit={handleSave} className="max-w-6xl mx-auto px-4 py-4 space-y-5 animate-fade-up">
+    <form onSubmit={handleSave} className="max-w-6xl mx-auto px-4 py-4 space-y-5">
       {/* Top Action Bar */}
       <div
         className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b"

@@ -116,9 +116,8 @@ export function TrackCover({
     <img
       src={coverArt}
       alt={`Copertina di ${title}`}
-      loading="lazy"
       decoding="async"
-      className={`${dims} object-cover border shrink-0`}
+      className={`${dims} cover-img object-cover border shrink-0`}
       style={{ borderColor: 'var(--border-color)' }}
     />
   );
