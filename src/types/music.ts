@@ -32,7 +32,7 @@ export interface Track {
 
 export interface LibraryExportFile {
   schemaVersion: 1;
-  appName: 'Spartito';
+  appName: 'Lira Craft' | 'Spartito';
   exportedAt: string;
   tracks: Track[];
 }

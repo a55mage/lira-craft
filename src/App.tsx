@@ -138,7 +138,7 @@ export default function App() {
               >
                 <Music className="w-4 h-4" />
               </span>
-              <span className="font-display text-lg tracking-tight">Spartito</span>
+              <span className="font-display text-lg tracking-tight">Lira Craft</span>
             </button>
 
             <span

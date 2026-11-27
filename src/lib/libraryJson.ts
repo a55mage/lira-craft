@@ -10,13 +10,13 @@ import { db } from '../db/database';
 export function buildExportPayload(tracks: Track[]): LibraryExportFile {
   return {
     schemaVersion: 1,
-    appName: 'Spartito',
+    appName: 'Lira Craft',
     exportedAt: new Date().toISOString(),
     tracks,
   };
 }
 
-export function downloadLibraryJson(tracks: Track[], filenamePrefix = 'spartito-library'): void {
+export function downloadLibraryJson(tracks: Track[], filenamePrefix = 'lira-craft-library'): void {
   const payload = buildExportPayload(tracks);
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: 'application/json',

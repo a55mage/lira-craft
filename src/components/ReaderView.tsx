@@ -956,17 +956,42 @@ export function ReaderView({
         </div>
       )}
 
-      {/* Sticky Floating Bottom Mini-Player Bar (Always reachable while scrolling) */}
-      <div className="fixed bottom-3 inset-x-0 z-30 px-4 pointer-events-none no-print">
+      {/* Full-Width Docked Bottom Player Bar */}
+      <div
+        className="fixed bottom-0 inset-x-0 z-30 border-t backdrop-blur-md no-print"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--bg-surface) 96%, transparent)',
+          borderColor: 'var(--border-color)',
+          boxShadow: '0 -6px 24px -8px rgba(59, 48, 41, 0.14)',
+        }}
+      >
+        {/* Top edge interactive progress bar */}
         <div
-          className="max-w-5xl mx-auto rounded-2xl border px-3.5 py-2.5 shadow-xl backdrop-blur-md pointer-events-auto flex flex-wrap items-center justify-between gap-2.5"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--bg-surface) 94%, transparent)',
-            borderColor: 'var(--border-color)',
+          className="relative h-1.5 w-full cursor-pointer group"
+          style={{ backgroundColor: 'var(--bg-surface-2)' }}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            setCurrentBeat(ratio * totalBeats);
+            setWaitingEventId(null);
+            waitingEventRef.current = null;
+            satisfiedEventIdsRef.current.clear();
+            lastTriggeredEventId.current = -1;
           }}
+          title="Clicca per spostarti nel brano"
         >
+          <div
+            className="h-full transition-[width] duration-75"
+            style={{
+              width: `${totalBeats > 0 ? Math.min(100, (currentBeat / totalBeats) * 100) : 0}%`,
+              backgroundColor: 'var(--accent)',
+            }}
+          />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
           {/* Transport */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handlePlayToggle}
@@ -994,10 +1019,13 @@ export function ReaderView({
             >
               <Square className="w-3.5 h-3.5" />
             </button>
+            <span className="hidden md:inline text-xs font-medium truncate max-w-[180px]" style={{ color: 'var(--text-secondary)' }}>
+              {track.title}
+            </span>
           </div>
 
           {/* Progress Scrubber */}
-          <div className="flex items-center gap-2 flex-1 min-w-[130px] max-w-xs text-[11px]">
+          <div className="flex items-center gap-2 flex-1 min-w-[130px] max-w-sm text-[11px]">
             <input
               type="range"
               min={0}

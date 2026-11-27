@@ -371,7 +371,7 @@ export function LibraryView({ tracks, onOpenTrack, onEditTrack }: LibraryViewPro
             return (
               <div
                 key={track.id}
-                className="rounded-xl border p-3.5 flex flex-col justify-between gap-2.5 transition duration-200 hover:-translate-y-0.5 music-paper"
+                className="rounded-xl border p-3.5 flex flex-col justify-between gap-2.5 transition-colors duration-150 music-paper"
                 style={{ borderColor: 'var(--border-color)' }}
               >
                 <div className="space-y-2.5">
